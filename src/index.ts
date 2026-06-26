@@ -65,16 +65,16 @@ export function activate(_status?: 'onStartupFinished', _arg?: string): void {
 		try {
 			const netlistFile = await eda.sch_ManufactureData.getNetlistFile();
 			if (!netlistFile) {
-				eda.sys_Message.showToastMessage('无法获取网表文件');
+				eda.sys_Message.showToastMessage(eda.sys_I18n.text('无法获取网表文件'));
 				return;
 			}
 			const netlistStr = await netlistFile.text();
 			const netlist = JSON.parse(netlistStr);
 			eda.sys_MessageBus.push('netlist-analyzer:data', { netlist, netlistStr });
-			eda.sys_Message.showToastMessage('网表已刷新');
+			eda.sys_Message.showToastMessage(eda.sys_I18n.text('网表已刷新'));
 		}
 		catch (e: any) {
-			eda.sys_Message.showToastMessage(`刷新失败: ${e?.message || e}`);
+			eda.sys_Message.showToastMessage(eda.sys_I18n.text('刷新失败: ${1}', undefined, undefined, e?.message || e));
 		}
 	});
 
@@ -82,7 +82,7 @@ export function activate(_status?: 'onStartupFinished', _arg?: string): void {
 	eda.sys_MessageBus.pull('netlist-analyzer:apply-to-canvas', async (data: any) => {
 		try {
 			if (!data || (!data.lines?.length && !data.texts?.length)) {
-				eda.sys_Message.showToastMessage('没有可应用的图形数据');
+				eda.sys_Message.showToastMessage(eda.sys_I18n.text('没有可应用的图形数据'));
 				return;
 			}
 			const createdIds: Array<string> = [];
@@ -133,10 +133,10 @@ export function activate(_status?: 'onStartupFinished', _arg?: string): void {
 				catch (e) {
 				}
 			}
-			eda.sys_Message.showToastMessage(`已创建 ${createdIds.length} 个图元`);
+			eda.sys_Message.showToastMessage(eda.sys_I18n.text('已创建 ${1} 个图元', undefined, undefined, createdIds.length));
 		}
 		catch (e: any) {
-			eda.sys_Message.showToastMessage(`应用到画布失败: ${e?.message || e}`);
+			eda.sys_Message.showToastMessage(eda.sys_I18n.text('应用到画布失败: ${1}', undefined, undefined, e?.message || e));
 		}
 	});
 }
@@ -147,7 +147,7 @@ export function activate(_status?: 'onStartupFinished', _arg?: string): void {
 export function about(): void {
 	eda.sys_Dialog.showInformationMessage(
 		'Netlist Explorer v1.0.5',
-		'About',
+		eda.sys_I18n.text('About'),
 	);
 }
 
@@ -156,7 +156,7 @@ export function about(): void {
  */
 export async function generateNetlist(): Promise<void> {
 	eda.sys_IFrame.openIFrame('/iframe/netlist.html', 1400, 900, 'netlist-iframe', {
-		title: '网表生成器',
+		title: eda.sys_I18n.text('网表生成器'),
 		maximizeButton: true,
 		minimizeButton: true,
 	});

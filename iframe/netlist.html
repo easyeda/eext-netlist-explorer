@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>网表生成器</title>
+  <title>Netlist Generator</title>
   <style>
     :root {
       --bg: #f9fafb; --bg-white: #ffffff; --border: #e5e7eb;
@@ -226,32 +226,32 @@
     <header class="header">
       <span class="header-title" data-i18n="title">网表生成器</span>
       <div class="header-actions">
-        <button id="btn-refresh" class="icon-btn" title="刷新网表" style="width:auto;padding:0 10px;">
+        <button id="btn-refresh" class="icon-btn" title="Refresh Netlist" style="width:auto;padding:0 10px;">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
         </button>
-        <button id="btn-theme" class="icon-btn" title="切换主题">
+        <button id="btn-theme" class="icon-btn" title="Toggle Theme">
           <svg id="theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
           <svg id="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
         </button>
-        <button id="btn-lang" class="icon-btn" title="切换语言"><span id="lang-label">EN</span></button>
-        <button id="btn-bom" class="btn btn-secondary" style="display:none;">提取 BOM</button>
+        <!-- Language auto-switches via platform eda.sys_I18n API -->
+        <button id="btn-bom" class="btn btn-secondary" style="display:none;">Extract BOM</button>
         <div class="export-dropdown" id="export-dropdown" style="display:none;">
           <button id="btn-export" class="export-btn-main">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            导出
+            <span data-i18n="btnExport">导出</span>
           </button>
           <div class="export-menu" id="export-menu">
             <button class="export-menu-item" data-action="export-full-csv">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>
-              引脚网络表 CSV
+              <span data-i18n="exportFullCsv">引脚网络表 CSV</span>
             </button>
             <button class="export-menu-item" data-action="export-conn-csv">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-              网络连接表 CSV
+              <span data-i18n="exportConnCsv">网络连接表 CSV</span>
             </button>
             <button class="export-menu-item" data-action="export-json">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-              网表JSON
+              <span data-i18n="exportJson">网表JSON</span>
             </button>
           </div>
         </div>
@@ -291,7 +291,7 @@
     </div>
 
     <div id="loading" style="flex:1;display:flex;align-items:center;justify-content:center;color:#6b7280;">
-      <div class="loading">正在生成网表...</div>
+      <div class="loading">Generating netlist...</div>
     </div>
 
     <!-- 主内容区：左侧边栏 + 右侧内容 -->
@@ -574,9 +574,22 @@
       }
     };
 
-    var savedLang = localStorage.getItem('netexp-lang');
-    var currentLang = (savedLang === 'en' || savedLang === 'zh') ? savedLang : 'zh';
+    var currentLang = 'zh';
     var t = function(key) { return I18N[currentLang][key] || I18N['en'][key] || key; };
+
+    // Use platform API for automatic language detection
+    try {
+      eda.sys_I18n.getCurrentLanguage().then(function(lang) {
+        currentLang = (lang && lang.startsWith('en')) ? 'en' : 'zh';
+        applyI18n();
+      });
+    } catch(e) {}
+    try {
+      eda.sys_I18n.addLanguageChangedEventListener('netlist-iframe-i18n', function(newLang) {
+        currentLang = (newLang && newLang.startsWith('en')) ? 'en' : 'zh';
+        applyI18n();
+      }, false);
+    } catch(e) {}
 
     // 防抖变量
     var themeRenderTimeout = null;
@@ -629,9 +642,13 @@
         var text = t(key);
         if (text) i18nCache[key].forEach(function(el) { el.textContent = text; });
       }
+      // 处理 placeholder 翻译
+      document.querySelectorAll('[data-i18n-placeholder]').forEach(function(el) {
+        var key = el.getAttribute('data-i18n-placeholder');
+        var text = t(key);
+        if (text) el.placeholder = text;
+      });
       document.title = t('title');
-      var langLabel = document.getElementById('lang-label');
-      if (langLabel) langLabel.textContent = currentLang === 'zh' ? 'EN' : '中';
 
       // 按需重渲染当前可见面板
       if (netlistData) {
@@ -664,16 +681,7 @@
       }
     }
 
-    var langSwitchTimeout = null;
-
-    document.getElementById('btn-lang').addEventListener('click', function() {
-      if (langSwitchTimeout) clearTimeout(langSwitchTimeout);
-      langSwitchTimeout = setTimeout(function() {
-        currentLang = currentLang === 'zh' ? 'en' : 'zh';
-        localStorage.setItem('netexp-lang', currentLang);
-        applyI18n();
-      }, 100);
-    });
+    // Language auto-switches via platform eda.sys_I18n API (no manual toggle needed)
 
     document.getElementById('btn-refresh').addEventListener('click', function() {
       var btn = this;
