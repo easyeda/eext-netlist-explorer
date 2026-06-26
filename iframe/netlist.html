@@ -1,0 +1,3695 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>网表生成器</title>
+  <style>
+    :root {
+      --bg: #f9fafb; --bg-white: #ffffff; --border: #e5e7eb;
+      --text-primary: #1f2937; --text-secondary: #374151; --text-muted: #6b7280; --text-faint: #9ca3af;
+      --hover-bg: #f3f4f6; --active-bg: #eff6ff; --active-border: #bfdbfe; --active-color: #2563eb;
+      --table-header-bg: #f9fafb; --row-hover: #f9fafb;
+      --json-bg: #1f2937; --json-text: #e5e7eb;
+      --panel-header-bg: #f9fafb;
+    }
+    [data-theme="dark"] {
+      --bg: #111827; --bg-white: #1f2937; --border: #374151;
+      --text-primary: #f9fafb; --text-secondary: #e5e7eb; --text-muted: #9ca3af; --text-faint: #6b7280;
+      --hover-bg: #374151; --active-bg: #1e3a5f; --active-border: #1d4ed8; --active-color: #60a5fa;
+      --table-header-bg: #111827; --row-hover: #1f2937;
+      --json-bg: #111827; --json-text: #d1d5db;
+      --panel-header-bg: #1f2937;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 100%; height: 100%; overflow: hidden; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text-primary); font-size: 14px; line-height: 1.5; }
+    #app { display: flex; flex-direction: column; width: 100%; height: 100%; }
+    .header { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; height: 56px; background: var(--bg-white); border-bottom: 1px solid var(--border); z-index: 10; }
+    .header-title { font-size: 15px; font-weight: 600; color: var(--text-primary); padding-bottom: 2px; border-bottom: 2px solid #2563eb; }
+    .header-actions { display: flex; align-items: center; gap: 8px; position: relative; }
+    .btn { padding: 6px 16px; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; transition: background 0.15s, color 0.15s; }
+    .btn-primary { background: linear-gradient(135deg, #4A90E2 0%, #2563EB 100%); color: #fff; }
+    .btn-primary:hover { background: linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%); }
+    .btn-secondary { background: var(--hover-bg); color: var(--text-secondary); }
+    .btn-secondary:hover { background: var(--border); }
+    .icon-btn { width: 32px; height: 32px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-white); color: var(--text-muted); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; transition: background 0.15s, color 0.15s; }
+    .icon-btn:hover { background: var(--hover-bg); color: var(--text-primary); }
+    .icon-btn svg { width: 16px; height: 16px; }
+    .export-dropdown { position: relative; }
+    .export-btn-main { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 6px 16px; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; transition: background 0.15s; background: linear-gradient(135deg, #4A90E2 0%, #2563EB 100%); color: #fff; }
+    .export-btn-main:hover { background: linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%); }
+    .export-btn-main svg { width: 16px; height: 16px; flex-shrink: 0; }
+    .export-menu { display: none; position: absolute; top: 100%; right: 0; margin-top: 8px; background: var(--bg-white); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 4px 16px rgba(0,0,0,0.12); min-width: 180px; z-index: 100; overflow: hidden; }
+    .export-menu.show { display: block; }
+    .export-menu-item { display: flex; align-items: center; gap: 8px; padding: 10px 16px; font-size: 13px; color: var(--text-secondary); cursor: pointer; transition: background 0.1s; border: none; background: none; width: 100%; text-align: left; white-space: nowrap; }
+    .export-menu-item:hover { background: var(--hover-bg); }
+    .export-menu-item svg { width: 16px; height: 16px; color: var(--text-muted); }
+
+    /* 顶部统计栏 */
+    .stats-bar { flex-shrink: 0; display: flex; align-items: center; justify-content: flex-start; gap: 24px; padding: 6px 20px; background: var(--bg-white); border-bottom: 1px solid var(--border); }
+    .stat-item { display: flex; flex-direction: row; align-items: center; gap: 6px; white-space: nowrap; flex-shrink: 0; }
+    .stat-icon { width: 16px; height: 16px; color: var(--text-muted); flex-shrink: 0; }
+    .stat-text { display: flex; flex-direction: row; gap: 4px; align-items: baseline; white-space: nowrap; }
+    .stat-value { font-size: 14px; font-weight: 700; color: var(--text-primary); white-space: nowrap; }
+    .stat-value.warn { color: #f97316; }
+    .stat-label { font-size: 11px; color: var(--text-faint); font-weight: 400; white-space: nowrap; }
+
+    /* 主内容区 */
+    .main-layout { flex: 1; display: flex; overflow: hidden; }
+
+    /* 左侧边栏 */
+    .sidebar { flex-shrink: 0; width: 200px; background: var(--bg-white); border-right: 1px solid var(--border); padding: 12px; display: flex; flex-direction: column; overflow: hidden; }
+    .sidebar-nav { flex: 1; overflow-y: auto; }
+    .sidebar-footer { border-top: 1px solid var(--border); padding: 10px 4px 4px; margin-top: 8px; }
+    .sidebar-footer-name { font-size: 12px; font-weight: 700; color: var(--text-secondary); letter-spacing: 0.02em; }
+    .sidebar-footer-version { font-size: 11px; color: var(--text-faint); margin-top: 2px; }
+    .sidebar-item { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-radius: 10px; cursor: pointer; font-size: 14px; font-weight: 600; color: var(--text-muted); transition: all 0.15s; margin-bottom: 6px; border: 1px solid transparent; white-space: nowrap; }
+    .sidebar-item:hover { background: var(--hover-bg); color: var(--text-secondary); border-color: var(--border); }
+    .sidebar-item.active { background: var(--active-bg); color: var(--active-color); border-color: var(--active-border); box-shadow: 0 1px 3px rgba(37,99,235,0.1); }
+    .sidebar-item svg { width: 20px; height: 20px; flex-shrink: 0; }
+
+    /* 右侧内容区 */
+    .content-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; background: var(--bg-white); }
+    .content-panel { display: none; flex-direction: column; flex: 1; min-height: 0; position: relative; overflow: hidden; width: 100%; height: 100%; }
+    .content-panel.active { display: flex; }
+    #panel-full-table, #panel-connection-table { overflow-y: auto; }
+    .panel-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--panel-header-bg); border-bottom: 1px solid var(--border); border-radius: 6px 6px 0 0; flex-shrink: 0; }
+    .panel-header-title { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--text-secondary); white-space: nowrap; flex-shrink: 0; }
+    .panel-header-title svg { width: 16px; height: 16px; color: var(--text-muted); flex-shrink: 0; }
+    .panel-header-right { display: flex; align-items: center; gap: 6px; }
+    .panel-export-btn { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-white); font-size: 12px; font-weight: 500; color: var(--text-secondary); cursor: pointer; transition: background 0.15s; white-space: nowrap; flex-shrink: 0; }
+    .panel-export-btn:hover { background: var(--hover-bg); }
+    .panel-export-btn svg { width: 14px; height: 14px; }
+    .filter-bar { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+    .filter-select { padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 12px; background: var(--bg-white); color: var(--text-secondary); cursor: pointer; max-width: 140px; }
+    .filter-select:hover { border-color: var(--text-faint); }
+    .pin-mapping-select { padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 12px; background: var(--bg-white); color: var(--text-secondary); cursor: pointer; }
+    .pin-mapping-select:hover { border-color: var(--text-faint); }
+    .pin-mapping-select:disabled { opacity: 0.5; cursor: not-allowed; }
+    .net-type-filter { display: flex; align-items: center; gap: 4px; }
+    .ntf-btn { padding: 4px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 12px; background: var(--bg-white); color: var(--text-secondary); cursor: pointer; transition: background 0.15s, color 0.15s; white-space: nowrap; flex-shrink: 0; }
+    .ntf-btn:hover { background: var(--hover-bg); }
+    .ntf-btn.active { background: #1f2937; color: #fff; border-color: #1f2937; }
+    .ntf-btn[data-type="power"].active { background: #dc2626; border-color: #dc2626; color: #fff; }
+    .ntf-btn[data-type="gnd"].active   { background: #6b7280; border-color: #6b7280; color: #fff; }
+    .ntf-btn[data-type="signal"].active { background: #16a34a; border-color: #16a34a; color: #fff; }
+    .btn-plain { background: transparent; border: none; outline: none; box-shadow: none; padding: 4px 8px; font-size: 12px; color: var(--text-muted); cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+
+    /* 表格容器占满高度 */
+    .table-container { width: 100%; }
+    .table-container table { width: 100%; border-collapse: collapse; }
+
+    /* JSON 和映射图占满区域 */
+    .mapping-viewport { flex: 1; min-height: 0; }
+
+    /* 表格样式 */
+    .netlist-table { width: 100%; border-collapse: collapse; }
+    .netlist-table th { background: var(--table-header-bg); padding: 10px 12px; text-align: left; font-size: 12px; font-weight: 600; color: var(--text-muted); border-bottom: 2px solid var(--border); position: sticky; top: 0; white-space: nowrap; }
+    .netlist-table td { padding: 8px 12px; border-bottom: 1px solid var(--hover-bg); font-size: 12px; white-space: nowrap; }
+    .netlist-table tr:hover { background: var(--row-hover); }
+    .net-name { color: #059669; font-weight: 600; white-space: nowrap; }
+    .pin-num { color: #2563eb; white-space: nowrap; }
+    .category-tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; background: #f3f4f6; color: #374151; white-space: nowrap; }
+    .category-tag.ic { background: #dbeafe; color: #1e40af; }
+    .category-tag.resistor { background: #fef3c7; color: #92400e; }
+    .category-tag.capacitor { background: #d1fae5; color: #065f46; }
+    .category-tag.inductor { background: #fce7f3; color: #9d174d; }
+    .category-tag.diode { background: #fee2e2; color: #991b1b; }
+    .category-tag.connector { background: #e0e7ff; color: #3730a3; }
+    .category-tag.crystal { background: #f3e8ff; color: #6b21a8; }
+    .category-tag.other { background: #f3f4f6; color: #6b7280; }
+    .group-header { background: var(--table-header-bg); font-weight: 700; color: var(--text-primary); }
+    .group-header td { padding: 10px 12px; border-bottom: 2px solid var(--border); font-size: 13px; white-space: nowrap; }
+    .interface-tag { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 500; white-space: nowrap; }
+    .interface-tag.uplink { background: #dbeafe; color: #1e40af; }
+    .interface-tag.power { background: #fee2e2; color: #991b1b; }
+    .interface-tag.clock { background: #d1fae5; color: #065f46; }
+    .interface-tag.other { background: #f3f4f6; color: #6b7280; }
+
+    /* JSON 视图 */
+    .json-view { width: 100%; flex: 1; background: var(--json-bg); color: var(--json-text); padding: 16px; border-radius: 8px; font-family: monospace; font-size: 12px; line-height: 1.6; overflow: auto; white-space: pre; min-height: 0; box-sizing: border-box; }
+
+    /* 缩放控件 */
+    .zoom-controls { position: absolute; top: 0; right: 0; z-index: 10; display: flex; align-items: center; gap: 4px; background: var(--bg-white); padding: 4px 8px; border-radius: 8px; border: 1px solid var(--border); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .zoom-btn { width: 28px; height: 28px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-white); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; color: var(--text-secondary); }
+    .zoom-btn:hover { background: var(--hover-bg); }
+    .zoom-level { font-size: 12px; color: var(--text-muted); min-width: 40px; text-align: center; }
+    .schematic-viewport { position: relative; width: 100%; height: 100%; min-height: 500px; overflow: hidden; cursor: grab; background: var(--bg-white); }
+    .schematic-viewport.dragging { cursor: grabbing; }
+    .schematic-canvas { position: absolute; transform-origin: 0 0; }
+
+    /* 引脚映射 */
+    .mapping-viewport { position: relative; width: 100%; height: 100%; overflow: hidden; cursor: grab; background: var(--bg-white); }
+    .mapping-viewport.dragging { cursor: grabbing; }
+    .mapping-canvas { position: absolute; transform-origin: 0 0; will-change: transform; }
+    .mapping-canvas.smooth-transition { transition: transform 0.15s ease-out; }
+    /* 器件星图面板：过滤按钮（独立类，避免与连接器映射的 .ntf-btn 处理器冲突） */
+    .star-ntf-btn { padding: 4px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 12px; background: var(--bg-white); color: var(--text-secondary); cursor: pointer; transition: background 0.15s, color 0.15s; white-space: nowrap; flex-shrink: 0; }
+    .star-ntf-btn:hover { background: var(--hover-bg); }
+    .star-ntf-btn.active { background: #1f2937; color: #fff; border-color: #1f2937; }
+    .star-ntf-btn[data-type="power"].active { background: #dc2626; border-color: #dc2626; color: #fff; }
+    .star-ntf-btn[data-type="gnd"].active   { background: #6b7280; border-color: #6b7280; color: #fff; }
+    .star-ntf-btn[data-type="signal"].active { background: #16a34a; border-color: #16a34a; color: #fff; }
+    /* 网络列表切换按钮 - 与过滤按钮样式统一 */
+    .toggle-btn-with-icon {
+      padding: 4px 10px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 12px;
+      background: var(--bg-white);
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+      white-space: nowrap;
+      flex-shrink: 0;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .toggle-btn-with-icon .icon-char {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+    .toggle-btn-with-icon:hover {
+      background: var(--hover-bg);
+    }
+    .toggle-btn-with-icon:hover .icon-char {
+      color: var(--text-primary);
+    }
+    #star-canvas svg .star-comp-node { cursor: pointer; }
+    #star-canvas svg .star-pin { cursor: pointer; }
+    #star-canvas svg .star-net-label { pointer-events: none; }
+    .mapping-controls { position: absolute; top: 0; right: 0; z-index: 10; display: flex; align-items: center; gap: 6px; background: var(--bg-white); padding: 4px 8px; border-radius: 8px; border: 1px solid var(--border); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .mapping-controls select { padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 12px; background: var(--bg-white); color: var(--text-secondary); cursor: pointer; max-width: 150px; }
+    .mapping-controls select:hover { border-color: var(--text-faint); }
+
+    /* 星图网络列表侧边栏 */
+    .star-network-sidebar { width: 200px; background: var(--bg-white); border-left: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0; }
+    .star-network-search { padding: 8px; border-bottom: 1px solid var(--border); }
+    .star-network-search input { width: 100%; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 12px; background: var(--bg); color: var(--text-primary); outline: none; transition: border-color 0.15s; }
+    .star-network-search input:focus { border-color: #2563eb; }
+    .star-network-list { flex: 1; overflow-y: auto; padding: 4px; }
+    .star-network-item { display: grid; grid-template-columns: 1fr auto 20px; align-items: center; gap: 6px; padding: 6px 8px; margin-bottom: 2px; border-radius: 6px; cursor: pointer; transition: background 0.15s; font-size: 12px; min-height: 28px; }
+    .star-network-item:hover { background: var(--hover-bg); }
+    .star-network-item.filtered { opacity: 0.5; text-decoration: line-through; }
+    .star-network-item .net-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 16px; }
+    .star-network-item .net-info { font-size: 11px; color: var(--text-muted); line-height: 16px; }
+    .star-network-item .filter-icon { width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; border-radius: 4px; background: var(--hover-bg); color: var(--text-muted); font-size: 12px; font-weight: normal; }
+    .star-network-item .filter-icon.active { background: #e6a23c; color: #fff; }
+    .star-network-header { display: grid; grid-template-columns: 1fr auto 32px; align-items: center; gap: 8px; padding: 8px; border-bottom: 1px solid var(--border); background: var(--table-header-bg); font-size: 11px; font-weight: 600; color: var(--text-muted); min-height: 32px; }
+    .star-network-header span[data-i18n="networkList"] { line-height: 16px; }
+    .star-network-count { display: flex; align-items: center; gap: 4px; line-height: 16px; }
+    .star-network-count .num { font-weight: 700; color: var(--text-primary); }
+    #star-close-sidebar { display: flex; align-items: center; justify-content: center; width: 32px; height: 24px; background: none; border: none; font-size: 18px; cursor: pointer; color: var(--text-muted); border-radius: 4px; padding: 0; margin: 0; line-height: 1; }
+    #star-close-sidebar:hover { background: var(--hover-bg); color: var(--text-primary); }
+
+    /* 加载状态 */
+    .loading { text-align: center; padding: 60px; color: var(--text-muted); font-size: 15px; }
+
+    /* BOM 弹窗 */
+    .bom-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 100; align-items: center; justify-content: center; }
+    .bom-modal.visible { display: flex; }
+    .bom-content { background: var(--bg-white); border-radius: 12px; width: 90%; max-width: 800px; max-height: 80vh; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+    .bom-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+    .bom-header h3 { font-size: 16px; font-weight: 600; }
+    .bom-close { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-muted); padding: 4px 8px; border-radius: 6px; }
+    .bom-body { padding: 16px 20px; overflow-y: auto; flex: 1; }
+    .bom-table { width: 100%; border-collapse: collapse; }
+    .bom-table th { background: var(--table-header-bg); padding: 10px 12px; text-align: left; font-size: 12px; font-weight: 600; color: var(--text-muted); border-bottom: 2px solid var(--border); position: sticky; top: 0; white-space: nowrap; }
+    .bom-table td { padding: 8px 12px; border-bottom: 1px solid var(--hover-bg); font-size: 12px; white-space: nowrap; }
+    .bom-actions { padding: 12px 20px; border-top: 1px solid var(--border); display: flex; gap: 8px; justify-content: flex-end; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <header class="header">
+      <span class="header-title" data-i18n="title">网表生成器</span>
+      <div class="header-actions">
+        <button id="btn-refresh" class="icon-btn" title="刷新网表" style="width:auto;padding:0 10px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        </button>
+        <button id="btn-theme" class="icon-btn" title="切换主题">
+          <svg id="theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          <svg id="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        </button>
+        <button id="btn-lang" class="icon-btn" title="切换语言"><span id="lang-label">EN</span></button>
+        <button id="btn-bom" class="btn btn-secondary" style="display:none;">提取 BOM</button>
+        <div class="export-dropdown" id="export-dropdown" style="display:none;">
+          <button id="btn-export" class="export-btn-main">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            导出
+          </button>
+          <div class="export-menu" id="export-menu">
+            <button class="export-menu-item" data-action="export-full-csv">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>
+              引脚网络表 CSV
+            </button>
+            <button class="export-menu-item" data-action="export-conn-csv">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+              网络连接表 CSV
+            </button>
+            <button class="export-menu-item" data-action="export-json">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              网表JSON
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- 顶部统计栏 -->
+    <div class="stats-bar" id="stats-bar" style="display:none;">
+      <div class="stat-item">
+        <svg class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>
+        <div class="stat-text">
+          <span class="stat-value" id="stat-components">0</span>
+          <span class="stat-label" data-i18n="statComponents">元件数量</span>
+        </div>
+      </div>
+      <div class="stat-item">
+        <svg class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+        <div class="stat-text">
+          <span class="stat-value" id="stat-nets">0</span>
+          <span class="stat-label" data-i18n="statNets">网络总数</span>
+        </div>
+      </div>
+      <div class="stat-item">
+        <svg class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="12" y1="18" x2="12" y2="22"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/><rect x="5" y="8" width="14" height="10" rx="2"/><line x1="12" y1="18" x2="12" y2="22"/></svg>
+        <div class="stat-text">
+          <span class="stat-value" id="stat-pins">0</span>
+          <span class="stat-label" data-i18n="statPins">引脚连接数</span>
+        </div>
+      </div>
+      <div class="stat-item">
+        <svg class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M12 11v2"/><circle cx="12" cy="16" r="0.5" fill="currentColor"/></svg>
+        <div class="stat-text">
+          <span class="stat-value" id="stat-unnamed">0</span>
+          <span class="stat-label" data-i18n="statUnnamed">未命名网络</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="loading" style="flex:1;display:flex;align-items:center;justify-content:center;color:#6b7280;">
+      <div class="loading">正在生成网表...</div>
+    </div>
+
+    <!-- 主内容区：左侧边栏 + 右侧内容 -->
+    <div id="main-content" class="main-layout" style="display:none;">
+      <!-- 左侧边栏 -->
+      <div class="sidebar">
+        <div class="sidebar-nav">
+          <div class="sidebar-item active" data-panel="full-table">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>
+          <span data-i18n="sidebarFullTable">引脚网络表</span>
+        </div>
+        <div class="sidebar-item" data-panel="connection-table">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+          <span data-i18n="sidebarConnTable">网络连接表</span>
+        </div>
+        <div class="sidebar-item" data-panel="pin-mapping">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="6" height="12" rx="1"/><rect x="16" y="6" width="6" height="12" rx="1"/><path d="M8 10h8M8 14h8"/></svg>
+          <span data-i18n="sidebarPinMapping">器件连接图</span>
+        </div>
+        <div class="sidebar-item" data-panel="star-graph">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><circle cx="4" cy="5" r="2"/><circle cx="20" cy="5" r="2"/><circle cx="4" cy="19" r="2"/><circle cx="20" cy="19" r="2"/><path d="M9.6 10.2L5.4 6.4M14.4 10.2l4.2-3.8M9.6 13.8l-4.2 3.8M14.4 13.8l4.2 3.8"/></svg>
+          <span data-i18n="sidebarStarGraph">器件拓扑图</span>
+        </div>
+        <div class="sidebar-item" data-panel="json">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M10 13l-2 2 2 2"/><path d="M14 13l2 2-2 2"/></svg>
+          <span data-i18n="sidebarJson">网表JSON</span>
+        </div>
+        </div>
+        <div class="sidebar-footer">
+          <div class="sidebar-footer-name" data-i18n="title">网表生成器</div>
+          <div class="sidebar-footer-version">v1.0.4</div>
+        </div>
+      </div>
+
+      <!-- 右侧内容区 -->
+      <div class="content-area">
+        <!-- 引脚网络表 -->
+        <div id="panel-full-table" class="content-panel active">
+          <div class="panel-header">
+              <span class="panel-header-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>
+                <span data-i18n="panelFullTable">引脚网络表</span>
+              </span>
+              <div class="filter-bar">
+                <select id="filter-full-desig" class="filter-select"><option value="" data-i18n="filterFullDesig">全部位号</option></select>
+                <select id="filter-full-net" class="filter-select"><option value="" data-i18n="filterFullNet">全部网络</option></select>
+                <button id="btn-clear-full-filter" class="btn-plain" data-i18n="clearFilter">清除筛选</button>
+              </div>
+              <button class="panel-export-btn" data-action="export-full-csv">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <span data-i18n="exportCsv">导出 CSV</span>
+              </button>
+          </div>
+          <table class="netlist-table"><thead><tr><th data-i18n="thRef">位号</th><th data-i18n="thPin">引脚号</th><th data-i18n="thPort">端口名</th><th data-i18n="thNet">网络</th><th data-i18n="thCat">器件分类</th><th data-i18n="thDesc">器件��明</th></tr></thead><tbody id="tbody-full-table"></tbody></table>
+        </div>
+
+        <!-- 网络连接表 -->
+        <div id="panel-connection-table" class="content-panel">
+          <div class="panel-header">
+            <span class="panel-header-title">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+              <span data-i18n="connectionTable">网络连接表</span>
+            </span>
+            <div class="filter-bar">
+              <select id="filter-conn-desig" class="filter-select"><option value="" data-i18n="allDesig">全部位号</option></select>
+              <select id="filter-conn-net" class="filter-select"><option value="" data-i18n="allNet">全部网络</option></select>
+              <button id="btn-clear-conn-filter" class="btn-plain" data-i18n="clearFilter">清除筛选</button>
+            </div>
+            <button class="panel-export-btn" data-action="export-conn-csv">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              <span data-i18n="exportCsv">导出 CSV</span>
+            </button>
+          </div>
+          <table class="netlist-table"><thead><tr><th data-i18n="thGroup">分组</th><th data-i18n="thSrcDev">来源器件</th><th data-i18n="thSrcPin">来源引脚</th><th data-i18n="thSrcPort">来源端口</th><th data-i18n="thNet">网络</th><th data-i18n="thDstDev">目标器件</th><th data-i18n="thDstPin">目标引脚</th><th data-i18n="thDstPort">目标端口</th><th data-i18n="thNote">备注</th></tr></thead><tbody id="tbody-connection-table"></tbody></table>
+        </div>
+
+        <!-- 器件连接图（引脚映射） -->
+        <div id="panel-pin-mapping" class="content-panel">
+          <div class="panel-header">
+            <span class="panel-header-title">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="6" height="12" rx="1"/><rect x="16" y="6" width="6" height="12" rx="1"/><path d="M8 10h8M8 14h8"/></svg>
+              <span data-i18n="pinMapping">器件连接图</span>
+            </span>
+            <div class="panel-header-right">
+              <div class="net-type-filter">
+                <button class="ntf-btn active" data-type="all" data-i18n="filterAll">全部</button>
+                <button class="ntf-btn" data-type="power" data-i18n="filterPower">电源</button>
+                <button class="ntf-btn" data-type="gnd" data-i18n="filterGnd">地</button>
+                <button class="ntf-btn" data-type="signal" data-i18n="filterSignal">信号</button>
+              </div>
+              <select id="device-select" class="pin-mapping-select" style="max-width:140px;"><option value="" data-i18n="selectDevice">-- 选择器件 --</option></select>
+              <select id="connector-pair-select" class="pin-mapping-select" style="max-width:160px;" disabled><option value="" data-i18n="selectPair">-- 选择连接器对 --</option></select>
+              <button class="zoom-btn" id="pm-zoom-in" title="Zoom In">+</button>
+              <span class="zoom-level" id="pm-zoom-level">100%</span>
+              <button class="zoom-btn" id="pm-zoom-out" title="Zoom Out">−</button>
+              <button class="zoom-btn" id="pm-zoom-reset" title="Reset">↺</button>
+              <button class="panel-export-btn" data-action="export-svg">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <span data-i18n="exportSvg">导出 SVG</span>
+              </button>
+            </div>
+          </div>
+          <div id="mapping-viewport" class="mapping-viewport">
+            <div id="mapping-canvas" class="mapping-canvas">
+              <div id="mapping-loading" data-i18n="loadingPm" style="color:#6b7280;padding:40px;">正在生成引脚映射...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 器件拓扑图（主从星型布局） -->
+        <div id="panel-star-graph" class="content-panel">
+          <div class="panel-header">
+            <span class="panel-header-title">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><circle cx="4" cy="5" r="2"/><circle cx="20" cy="5" r="2"/><circle cx="4" cy="19" r="2"/><circle cx="20" cy="19" r="2"/><path d="M9.6 10.2L5.4 6.4M14.4 10.2l4.2-3.8M9.6 13.8l-4.2 3.8M14.4 13.8l4.2 3.8"/></svg>
+              <span data-i18n="starGraph">器件拓扑图</span>
+            </span>
+            <div class="panel-header-right">
+              <button id="star-toggle-sidebar" class="toggle-btn-with-icon" style="display:none;margin-right:6px;">
+                <span class="icon-char">≡</span>
+                <span data-i18n="networkList">网络列表</span>
+              </button>
+              <div class="net-type-filter">
+                <button class="star-ntf-btn active" data-type="all" data-i18n="filterAll">全部</button>
+                <button class="star-ntf-btn" data-type="power" data-i18n="filterPower">电源</button>
+                <button class="star-ntf-btn" data-type="gnd" data-i18n="filterGnd">地</button>
+                <button class="star-ntf-btn" data-type="signal" data-i18n="filterSignal">信号</button>
+              </div>
+              <select id="star-device-select" class="pin-mapping-select" style="max-width:160px;"><option value="" data-i18n="selectMainDevice">-- 选择主器件 --</option></select>
+              <button class="zoom-btn" id="sz-zoom-in" title="Zoom In">+</button>
+              <span class="zoom-level" id="sz-zoom-level">100%</span>
+              <button class="zoom-btn" id="sz-zoom-out" title="Zoom Out">−</button>
+              <button class="zoom-btn" id="sz-zoom-reset" title="Reset">↺</button>
+              <button class="panel-export-btn" data-action="export-star-svg">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <span data-i18n="exportSvg">导出 SVG</span>
+              </button>
+            </div>
+          </div>
+          <div style="display:flex;flex:1;overflow:hidden;min-height:0;">
+            <div id="star-viewport" class="mapping-viewport" style="flex:1;">
+              <div id="star-canvas" class="mapping-canvas">
+                <div id="star-loading" data-i18n="selectMainDeviceHint" style="color:#6b7280;padding:40px;">请选择主器件以生成星图</div>
+              </div>
+            </div>
+            <div id="star-network-sidebar" class="star-network-sidebar" style="display:none;">
+              <div class="star-network-header">
+                <span data-i18n="networkList">网络列表</span>
+                <div class="star-network-count">
+                  <span class="num" id="star-total-nets">0</span>
+                  <span>/</span>
+                  <span id="star-filtered-nets">0</span>
+                </div>
+                <button id="star-close-sidebar">&times;</button>
+              </div>
+              <div class="star-network-search">
+                <input type="text" id="star-network-search-input" data-i18n-placeholder="searchNetwork" placeholder="搜索网络..." />
+              </div>
+              <div class="star-network-list" id="star-network-list">
+                <!-- 网络列表项将由 JavaScript 动态生成 -->
+              </div>
+            </div>
+          </div>
+          <div id="star-filter-tags" style="position:absolute;bottom:12px;right:12px;z-index:20;display:none;max-width:320px;"></div>
+        </div>
+
+        <!-- 网表JSON -->
+        <div id="panel-json" class="content-panel">
+          <div class="panel-header">
+            <span class="panel-header-title">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M10 13l-2 2 2 2"/><path d="M14 13l2 2-2 2"/></svg>
+              <span data-i18n="panelJson">网表JSON</span>
+            </span>
+            <button class="panel-export-btn" data-action="export-json">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              <span data-i18n="exportJson">导出 JSON</span>
+            </button>
+          </div>
+          <div class="json-view" id="json-view"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOM 弹窗 -->
+  <div id="bom-modal" class="bom-modal">
+    <div class="bom-content">
+      <div class="bom-header"><h3 data-i18n="bomTitle">BOM 清单</h3><button id="bom-close" class="bom-close">&times;</button></div>
+      <div class="bom-body"><table class="bom-table"><thead><tr><th data-i18n="thBomDesig">位号</th><th data-i18n="thBomName">器件名称</th><th data-i18n="thBomValue">规格</th><th data-i18n="thBomFootprint">封装</th><th data-i18n="thBomMfr">制造商</th><th data-i18n="thBomMpn">型号</th><th data-i18n="thBomSpn">供应商料号</th><th data-i18n="thBomQty">数量</th></tr></thead><tbody id="bom-tbody"></tbody></table></div>
+      <div class="bom-actions"><button id="bom-export-csv" class="btn btn-secondary" data-i18n="bomExport">导出 CSV</button></div>
+    </div>
+  </div>
+
+  <script>
+    // ===== i18n =====
+    var I18N = {
+      zh: {
+        title:'网表生成器', btnBom:'提取 BOM', btnExport:'导出',
+        exportFullCsv:'引脚网络表 CSV', exportConnCsv:'网络连接表 CSV', exportJson:'网表JSON',
+        statComponents:'元件数量', statNets:'网络总数', statPins:'引脚连接数',
+        statFloating:'悬空引脚', statUnnamed:'未命名网络',
+        panelFullTable:'引脚网络表', panelConnTable:'网络连接表', panelPinMapping:'器件连接图', panelJson:'网表JSON',
+        exportCsv:'导出 CSV', exportSvg:'导出 SVG',
+        selectPair:'-- 选择连接器对 --', selectDevice:'-- 选择器件 --', noPairSelected:'请选择连接器对',
+        thFull:['位号','引脚号','端口名','网络','器件分类','器件说明'],
+        thConn:['分组','来源器件','来源引脚','来源端口','网络','目标器件','目标引脚','目标端口','备注'],
+        bomTitle:'BOM 清单', thBom:['位号','器件名称','规格','封装','制造商','型号','供应商料号','数量'], bomExport:'导出 CSV',
+        loading:'正在生成网表...', loadingPm:'正在生成引脚映射...',
+        netFloating:'(悬空)', netUnnamed:'[未命名网络]',
+        catIc:'IC/模块', catR:'电阻', catC:'电容', catL:'电感', catD:'二极管', catQ:'三极管',
+        catY:'晶振', catConn:'连接器', catF:'保险丝', catFb:'磁珠', catTp:'测试点', catOther:'其他',
+        grpUplink:'上行接口', grpPower:'公共电源与地', grpClock:'时钟与辅助', grpOther:'其他接口',
+        toastFullCsv:'已导出引脚网络表CSV', toastConnCsv:'已导出网络连接表CSV',
+        toastJson:'已导出网表JSON', toastBomCsv:'已导出BOM CSV', toastSvg:'已导出器件连接图SVG',
+        toastRefreshing:'正在刷新网表...', toastRefreshed:'网表已刷新',
+        toastNoSvg:'请先选择连接器对以生成图形', noPairs:'未找到可配对的连接器',
+        sidebarFullTable:'引脚网络表', sidebarConnTable:'网络连接表', sidebarPinMapping:'器件连接图', sidebarJson:'网表JSON',
+        sidebarStarGraph:'器件拓扑图', starGraph:'器件拓扑图', selectMainDevice:'-- 选择主器件 --',
+        selectMainDeviceHint:'请选择主器件以生成拓扑图', clickToShow:'点击恢复显示',
+        toastStarSvg:'已导出器件拓扑图 SVG', toastNoStarSvg:'请先选择主器件以生成拓扑图',
+        filterFullDesig:'全部位号', filterFullNet:'全部网络', clearFilter:'清除筛选',
+        filterAll:'全部', filterPower:'电源', filterGnd:'地', filterSignal:'其他',
+        networkList:'网络列表', filteredNetworks:'已过滤的网络', searchNetwork:'搜索网络...', allNetworks:'全部网络',
+        showAll:'显示全部', pinCount:'引脚数',
+        connectionTable:'网络连接表', pinMapping:'器件连接图', allDesig:'全部位号', allNet:'全部网络',
+        panelJson:'网表JSON', exportJson:'导出JSON',
+        rendering:'正在渲染...', renderFailed:'渲染失败:', pmGenFailed:'引脚映射生成失败:',
+        connectorIncomplete:'连接器数据不完整',
+        condBlockedByC:'经C阻断', condByDiode:'经Diode', condByMosfet:'经MOSFET',
+        condByTransformer:'经变压器隔离', condByOpto:'经光耦隔离', condByIc:'IC边界',
+        condByRLow:'经低阻R', condByR:'经R', condByDiodeDir:'A→K单向', condByBjt:'经三极管',
+        condConnected:'条件相连',
+        endpoints:'共 {0} 个端点', networks:'({0} 个网络)',
+        thRef:'位号', thPin:'引脚号', thPort:'端口名', thNet:'网络', thCat:'器件分类', thDesc:'器件说明',
+        thGroup:'分组', thSrcDev:'来源器件', thSrcPin:'来源引脚', thSrcPort:'来源端口',
+        thDstDev:'目标器件', thDstPin:'目标引脚', thDstPort:'目标端口', thNote:'备注',
+        thBomDesig:'位号', thBomName:'器件名称', thBomValue:'规格', thBomFootprint:'封装',
+        thBomMfr:'制造商', thBomMpn:'型号', thBomSpn:'供应商料号', thBomQty:'数量'
+      },
+      en: {
+        title:'Netlist Explorer', btnBom:'Extract BOM', btnExport:'Export',
+        exportFullCsv:'Pin-Nets CSV', exportConnCsv:'Net Connections CSV', exportJson:'Netlist JSON',
+        statComponents:'Components', statNets:'Nets', statPins:'Pin Connections',
+        statFloating:'Floating Pins', statUnnamed:'Unnamed Nets',
+        panelFullTable:'Pin-Nets Table', panelConnTable:'Net Connections Table', panelPinMapping:'Device Connections', panelJson:'Netlist JSON',
+        exportCsv:'Export CSV', exportSvg:'Export SVG',
+        selectPair:'-- Select Connector Pair --', selectDevice:'-- Select Device --', noPairSelected:'Please select a connector pair',
+        thFull:['Ref','Pin','Port','Net','Category','Description'],
+        thConn:['Group','Src Device','Src Pin','Src Port','Net','Dst Device','Dst Pin','Dst Port','Note'],
+        bomTitle:'BOM', thBom:['Designators','Name','Value','Footprint','Manufacturer','MPN','SPN','Qty'], bomExport:'Export CSV',
+        loading:'Generating netlist...', loadingPm:'Generating pin map...',
+        netFloating:'(NC)', netUnnamed:'[Unnamed Net]',
+        catIc:'IC/Module', catR:'Resistor', catC:'Capacitor', catL:'Inductor', catD:'Diode', catQ:'Transistor',
+        catY:'Crystal', catConn:'Connector', catF:'Fuse', catFb:'Ferrite Bead', catTp:'Test Point', catOther:'Other',
+        grpUplink:'Uplink', grpPower:'Power/GND', grpClock:'Clock/Aux', grpOther:'Other',
+        toastFullCsv:'Exported Pin-Nets CSV', toastConnCsv:'Exported Net Connections CSV',
+        toastJson:'Exported Netlist JSON', toastBomCsv:'Exported BOM CSV', toastSvg:'Exported Device Connections SVG',
+        toastRefreshing:'Refreshing netlist...', toastRefreshed:'Netlist refreshed', toastNoSvg:'Please select a connector pair first', noPairs:'No connector pairs found',
+        sidebarFullTable:'Pin-Nets Table', sidebarConnTable:'Net Connections Table', sidebarPinMapping:'Device Connections', sidebarJson:'Netlist JSON',
+        sidebarStarGraph:'Device Topology', starGraph:'Device Topology', selectMainDevice:'-- Select Main Device --',
+        selectMainDeviceHint:'Select a main device to generate the topology', clickToShow:'Click to restore',
+        toastStarSvg:'Exported Device Topology SVG', toastNoStarSvg:'Please select a main device first',
+        filterFullDesig:'All Ref', filterFullNet:'All Nets', clearFilter:'Clear',
+        filterAll:'All', filterPower:'Power', filterGnd:'GND', filterSignal:'Other',
+        networkList:'Network List', filteredNetworks:'Filtered Networks', searchNetwork:'Search networks...', allNetworks:'All Networks',
+        showAll:'Show All', pinCount:'Pins',
+        connectionTable:'Net Connections Table', pinMapping:'Device Connections', allDesig:'All Ref', allNet:'All Nets',
+        panelJson:'Netlist JSON', exportJson:'Export JSON',
+        rendering:'Rendering...', renderFailed:'Render failed:', pmGenFailed:'Pin map failed:',
+        connectorIncomplete:'Incomplete connector data',
+        condBlockedByC:'Blocked by C', condByDiode:'Via Diode', condByMosfet:'Via MOSFET',
+        condByTransformer:'Via Transformer', condByOpto:'Via Optocoupler', condByIc:'IC Boundary',
+        condByRLow:'Via Low-R', condByR:'Via R', condByDiodeDir:'A→K unidirectional', condByBjt:'Via BJT/MOSFET',
+        condConnected:'Conditional',
+        endpoints:'{0} endpoints', networks:'({0} nets)',
+        thRef:'Ref', thPin:'Pin', thPort:'Port', thNet:'Net', thCat:'Category', thDesc:'Description',
+        thGroup:'Group', thSrcDev:'Src Device', thSrcPin:'Src Pin', thSrcPort:'Src Port',
+        thDstDev:'Dst Device', thDstPin:'Dst Pin', thDstPort:'Dst Port', thNote:'Note',
+        thBomDesig:'Designators', thBomName:'Name', thBomValue:'Value', thBomFootprint:'Footprint',
+        thBomMfr:'Manufacturer', thBomMpn:'MPN', thBomSpn:'SPN', thBomQty:'Qty'
+      }
+    };
+
+    var savedLang = localStorage.getItem('netexp-lang');
+    var currentLang = (savedLang === 'en' || savedLang === 'zh') ? savedLang : 'zh';
+    var t = function(key) { return I18N[currentLang][key] || I18N['en'][key] || key; };
+
+    // 防抖变量
+    var themeRenderTimeout = null;
+    
+    document.getElementById('btn-theme').addEventListener('click', function() {
+      var isDark = document.documentElement.dataset.theme === 'dark';
+      if (isDark) {
+        delete document.documentElement.dataset.theme;
+        localStorage.setItem('netexp-theme', 'light');
+        document.getElementById('theme-icon-moon').style.display = '';
+        document.getElementById('theme-icon-sun').style.display = 'none';
+      } else {
+        document.documentElement.dataset.theme = 'dark';
+        localStorage.setItem('netexp-theme', 'dark');
+        document.getElementById('theme-icon-moon').style.display = 'none';
+        document.getElementById('theme-icon-sun').style.display = '';
+      }
+      // 清除之前的渲染任务（防抖）
+      if (themeRenderTimeout) {
+        clearTimeout(themeRenderTimeout);
+      }
+      // 延迟渲染避免卡顿
+      themeRenderTimeout = setTimeout(function() {
+        var sel = document.getElementById('connector-pair-select');
+        if (sel && sel.value !== '' && window._pmPairs && window._pmGraph) {
+          var idx = parseInt(sel.value);
+          if (!isNaN(idx) && window._pmPairs[idx]) {
+            document.getElementById('mapping-canvas').innerHTML = renderPinMappingSVG(window._pmPairs[idx], window._pmGraph);
+            applyPinMappingFilter();
+            updatePmTransform();
+          }
+        }
+        // 星图随主题重渲染（颜色变化）
+        if (starInited && starMainDesig) drawStarGraph(false);
+      }, 100);
+    });
+
+    function applyI18n() {
+      // 重置 i18n 缓存（表头 th 新增了 data-i18n）
+      i18nCache = null;
+      if (!i18nCache) {
+        i18nCache = {};
+        document.querySelectorAll('[data-i18n]').forEach(function(el) {
+          var key = el.getAttribute('data-i18n');
+          if (!i18nCache[key]) i18nCache[key] = [];
+          i18nCache[key].push(el);
+        });
+      }
+      for (var key in i18nCache) {
+        var text = t(key);
+        if (text) i18nCache[key].forEach(function(el) { el.textContent = text; });
+      }
+      document.title = t('title');
+      var langLabel = document.getElementById('lang-label');
+      if (langLabel) langLabel.textContent = currentLang === 'zh' ? 'EN' : '中';
+
+      // 按需重渲染当前可见面板
+      if (netlistData) {
+        var activePanel = document.querySelector('.content-panel.active');
+        if (activePanel) {
+          var components = netlistData.components || netlistData;
+          var panelId = activePanel.id;
+          if (panelId === 'panel-full-table') {
+            renderFullTable(components);
+          } else if (panelId === 'panel-connection-table') {
+            renderConnectionTable(components);
+          } else if (panelId === 'panel-pin-mapping') {
+            var sel = document.getElementById('connector-pair-select');
+            if (sel && sel.value !== '' && window._pmPairs && window._pmGraph) {
+              var idx = parseInt(sel.value);
+              if (!isNaN(idx) && window._pmPairs[idx]) {
+                document.getElementById('mapping-canvas').innerHTML =
+                  renderPinMappingSVG(window._pmPairs[idx], window._pmGraph);
+                applyPinMappingFilter();
+                updatePmTransform();
+              }
+            }
+          } else if (panelId === 'panel-star-graph') {
+            if (starInited) {
+              populateStarDeviceSelect(buildStarModel(netlistData));
+              drawStarGraph(false);
+            }
+          }
+        }
+      }
+    }
+
+    var langSwitchTimeout = null;
+
+    document.getElementById('btn-lang').addEventListener('click', function() {
+      if (langSwitchTimeout) clearTimeout(langSwitchTimeout);
+      langSwitchTimeout = setTimeout(function() {
+        currentLang = currentLang === 'zh' ? 'en' : 'zh';
+        localStorage.setItem('netexp-lang', currentLang);
+        applyI18n();
+      }, 100);
+    });
+
+    document.getElementById('btn-refresh').addEventListener('click', function() {
+      var btn = this;
+      btn.disabled = true;
+      btn.style.opacity = '0.5';
+      var msg = currentLang === 'zh' ? '正在刷新网表...' : 'Refreshing netlist...';
+      eda.sys_Message.showToastMessage(msg);
+      try {
+        eda.sys_MessageBus.push('netlist-analyzer:refresh', { timestamp: Date.now() });
+      } catch (e) {}
+      setTimeout(function() {
+        btn.disabled = false;
+        btn.style.opacity = '1';
+      }, 2000);
+    });
+
+    var netlistData = null;
+
+    // 数据层行数组（用于数据层过滤）
+    var fullTableRows = [];
+    var connTableRows = [];
+    var renderGen = 0;
+    var i18nCache = null;
+
+    // 连接关系表分组键
+    var GROUP_ORDER = ['uplink','power','clock','other'];
+    var GROUP_KEYS = {uplink:'grpUplink', power:'grpPower', clock:'grpClock', other:'grpOther'};
+
+    // 双向筛选映射数据
+    var componentNetsMap = {};
+    var netComponentsMap = {};
+
+    // 强制刷新检测：如果页面是从缓存加载的，则强制刷新获取最新数据
+    (function() {
+      var navType = window.performance && window.performance.navigation ? window.performance.navigation.type : 0;
+      if (navType === 1) { // TYPE_RELOAD 表示从缓存加载
+        console.log('[网表] 页面从缓存加载，强制刷新...');
+        window.location.reload();
+        return;
+      }
+      // 检查是否有之前的时间戳
+      var now = Date.now();
+      var lastLoad = parseInt(sessionStorage.getItem('netlist_last_load') || '0');
+      if (now - lastLoad < 3000) { // 3秒内多次加载，认为是缓存
+        console.log('[网表] 检测到快速加载，强制刷新...');
+        window.location.reload();
+        return;
+      }
+      sessionStorage.setItem('netlist_last_load', now);
+    })();
+
+    function escapeHtml(t) { if (t == null) return ''; return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+    // 网络名称友好化处理
+    function friendlyNetName(net) {
+      if (!net || net === '(悬空)') return t('netFloating');
+      return net;
+    }
+
+    function classify(d) {
+      var p = d.replace(/\d+$/, '').toUpperCase();
+      var r = {U:['catIc','ic'],R:['catR','resistor'],C:['catC','capacitor'],L:['catL','inductor'],D:['catD','diode'],Q:['catQ','ic'],Y:['catY','crystal'],X:['catConn','connector'],J:['catConn','connector'],CN:['catConn','connector'],P:['catConn','connector'],USB:['catConn','connector'],F:['catF','other'],FB:['catFb','other'],TP:['catTp','other']};
+      var c = r[p]; return c ? {name:t(c[0]),css:c[1]} : {name:t('catOther'),css:'other'};
+    }
+
+    function desc(comp) { var p = comp.props || {}; return p.Description || p.Device_name || p.Value || ''; }
+
+    function isPublic(n) { 
+      if (!n || n === '(悬空)') return false; 
+      // 使用统一的电源/地判断函数
+      return isPwrNet(n) || isGndNet(n); 
+    }
+
+    function getGroup(n) { var u = (n||'').toUpperCase(); if (['USB','ETH','HDMI'].some(function(k){return u.indexOf(k)>=0;})) return [t('grpUplink'),'uplink']; if (isPwrNet(n) || isGndNet(n)) return [t('grpPower'),'power']; if (['CLK','OSC','RESET'].some(function(k){return u.indexOf(k)>=0;})) return [t('grpClock'),'clock']; return [t('grpOther'),'other']; }
+
+    function renderFullTable(components) {
+      fullTableRows = [];
+      for (var cid in components) {
+        var comp = components[cid];
+        var props = comp.props || {};
+        var pim = comp.pinInfoMap || {};
+        var desig = props.Designator || cid;
+        var cat = classify(desig);
+        var d = desc(comp);
+        for (var pn in pim) {
+          fullTableRows.push({
+            desig: desig,
+            pn: pn,
+            pinName: pim[pn].pinName || pim[pn].name || '',
+            net: pim[pn].net || '(悬空)',
+            catCss: cat.css,
+            catName: cat.name,
+            desc: d
+          });
+        }
+      }
+      renderGen++;
+      renderFullTableChunked(fullTableRows, renderGen);
+    }
+
+    function buildFullRowHtml(row) {
+      return '<tr><td>' + escapeHtml(row.desig) + '</td><td>' + escapeHtml(row.pn) +
+        '</td><td>' + escapeHtml(row.pinName) + '</td><td><span class="net-name">' +
+        escapeHtml(friendlyNetName(row.net)) + '</span></td><td><span class="category-tag ' +
+        row.catCss + '">' + escapeHtml(row.catName) + '</span></td><td>' +
+        escapeHtml(row.desc) + '</td></tr>';
+    }
+
+    function renderFullTableChunked(rows, gen) {
+      var CHUNK = 500;
+      var tbody = document.getElementById('tbody-full-table');
+      tbody.innerHTML = rows.slice(0, CHUNK).map(buildFullRowHtml).join('');
+      var offset = CHUNK;
+      function renderNext() {
+        if (renderGen !== gen) return;
+        if (offset >= rows.length) return;
+        tbody.insertAdjacentHTML('beforeend', rows.slice(offset, offset + CHUNK).map(buildFullRowHtml).join(''));
+        offset += CHUNK;
+        setTimeout(renderNext, 0);
+      }
+      if (rows.length > CHUNK) setTimeout(renderNext, 0);
+    }
+
+    function renderConnectionTable(components) {
+      var netToPins = {};
+      for (var cid in components) {
+        var comp = components[cid];
+        var props = comp.props || {};
+        var pim = comp.pinInfoMap || {};
+        var desig = props.Designator || cid;
+        for (var pn in pim) {
+          var net = pim[pn].net || '(悬空)';
+          var pinName = pim[pn].pinName || pim[pn].name || '';
+          if (net === '(悬空)') continue;
+          if (/^\$1N\d+$/.test(net) || /^\$\d+/.test(net)) continue;
+          if (!netToPins[net]) netToPins[net] = [];
+          netToPins[net].push({desig:desig, pn:pn, pinName:pinName});
+        }
+      }
+
+      var groups = {};
+      GROUP_ORDER.forEach(function(k) { groups[k] = []; });
+      for (var net in netToPins) {
+        var pins = netToPins[net];
+        var g = getGroup(net);
+        var gKey = g[1];
+        if (!groups[gKey]) groups['other'].push({net:net, pins:pins, css:g[1]});
+        else groups[gKey].push({net:net, pins:pins, css:g[1]});
+      }
+
+      connTableRows = [];
+      for (var group in groups) {
+        if (groups[group].length === 0) continue;
+        connTableRows.push({isHeader:true, group:group, count:groups[group].length});
+        for (var gi = 0; gi < groups[group].length; gi++) {
+          var item = groups[group][gi];
+          var net = item.net, pins = item.pins, css = item.css;
+          if (isPublic(net)) {
+            for (var pi = 0; pi < pins.length; pi++) {
+              connTableRows.push({isHeader:false, group:group, groupCss:css, srcDesig:net, srcPn:'', srcPinName:'', net:net, dstDesig:pins[pi].desig, dstPn:pins[pi].pn, dstPinName:pins[pi].pinName, note:''});
+            }
+          } else if (pins.length === 2) {
+            connTableRows.push({isHeader:false, group:group, groupCss:css, srcDesig:pins[0].desig, srcPn:pins[0].pn, srcPinName:pins[0].pinName, net:net, dstDesig:pins[1].desig, dstPn:pins[1].pn, dstPinName:pins[1].pinName, note:''});
+          } else {
+            for (var pi = 0; pi < pins.length; pi++) {
+              connTableRows.push({isHeader:false, group:group, groupCss:css, srcDesig:pins[pi].desig, srcPn:pins[pi].pn, srcPinName:pins[pi].pinName, net:net, dstDesig:'-', dstPn:'-', dstPinName:'-', note:t('endpoints').replace('{0}', pins.length)});
+            }
+          }
+        }
+      }
+      renderConnTableFiltered('', '');
+    }
+
+    function buildConnRowHtml(row) {
+      if (row.isHeader) {
+        var groupName = GROUP_KEYS[row.group] ? t(GROUP_KEYS[row.group]) : row.group;
+        return '<tr class="group-header"><td colspan="9">' + escapeHtml(groupName) + ' ' + t('networks').replace('{0}', row.count) + '</td></tr>';
+      }
+      var groupName = GROUP_KEYS[row.group] ? t(GROUP_KEYS[row.group]) : row.group;
+      return '<tr><td><span class="interface-tag ' + row.groupCss + '">' + escapeHtml(groupName) +
+        '</span></td><td>' + escapeHtml(row.srcDesig) + '</td><td>' + escapeHtml(row.srcPn) +
+        '</td><td>' + escapeHtml(row.srcPinName) + '</td><td><span class="net-name">' +
+        escapeHtml(row.net) + '</span></td><td>' + escapeHtml(row.dstDesig) +
+        '</td><td>' + escapeHtml(row.dstPn) + '</td><td>' + escapeHtml(row.dstPinName) +
+        '</td><td>' + escapeHtml(row.note) + '</td></tr>';
+    }
+
+    function renderConnTableFiltered(desig, net) {
+      var rows = connTableRows;
+      if (desig || net) {
+        rows = connTableRows.filter(function(r) {
+          if (r.isHeader) return true;
+          var matchDesig = !desig || r.srcDesig === desig || r.dstDesig === desig;
+          var matchNet = !net || r.net === net;
+          return matchDesig && matchNet;
+        });
+      }
+      document.getElementById('tbody-connection-table').innerHTML = rows.map(buildConnRowHtml).join('');
+    }
+
+    // ===== 筛选功能 =====
+
+    function populateFilters(components) {
+      var desigs = [];
+      var nets = {};
+      componentNetsMap = {};
+      netComponentsMap = {};
+      for (var cid in components) {
+        var comp = components[cid];
+        var desig = (comp.props || {}).Designator || cid;
+        desigs.push(desig);
+        componentNetsMap[desig] = [];
+        var pim = comp.pinInfoMap || {};
+        for (var pn in pim) {
+          var net = pim[pn].net || '';
+          if (net && net !== '(悬空)' && !/^\$/.test(net)) {
+            nets[net] = true;
+            if (componentNetsMap[desig].indexOf(net) === -1) {
+              componentNetsMap[desig].push(net);
+            }
+            if (!netComponentsMap[net]) netComponentsMap[net] = [];
+            if (netComponentsMap[net].indexOf(desig) === -1) {
+              netComponentsMap[net].push(desig);
+            }
+          }
+        }
+      }
+      desigs.sort();
+      var netList = Object.keys(nets).sort();
+
+      function fillSelect(id, items) {
+        var sel = document.getElementById(id);
+        if (!sel) return;
+        var first = sel.options[0] ? sel.options[0].text : '';
+        sel.innerHTML = '<option value="">' + escapeHtml(first) + '</option>' +
+          items.map(function(v) { return '<option value="' + escapeHtml(v) + '">' + escapeHtml(v) + '</option>'; }).join('');
+      }
+      fillSelect('filter-full-desig', desigs);
+      fillSelect('filter-full-net', netList);
+      fillSelect('filter-conn-desig', desigs);
+      fillSelect('filter-conn-net', netList);
+    }
+
+    function updateNetsForSelectedComponent(selectId, netSelectId) {
+      var desigSelect = document.getElementById(selectId);
+      var netSelect = document.getElementById(netSelectId);
+      if (!desigSelect || !netSelect) return;
+      var selectedDesig = desigSelect.value;
+      var currentNetValue = netSelect.value;
+      while (netSelect.options.length > 1) netSelect.remove(1);
+      if (selectedDesig && componentNetsMap[selectedDesig]) {
+        var nets = componentNetsMap[selectedDesig].sort();
+        nets.forEach(function(net) {
+          var o = document.createElement('option');
+          o.value = net; o.textContent = net;
+          netSelect.appendChild(o);
+        });
+      }
+      if (currentNetValue && [...netSelect.options].some(function(o) { return o.value === currentNetValue; })) {
+        netSelect.value = currentNetValue;
+      }
+    }
+
+    function updateComponentsForSelectedNet(selectId, desigSelectId) {
+      var netSelect = document.getElementById(selectId);
+      var desigSelect = document.getElementById(desigSelectId);
+      if (!desigSelect || !netSelect) return;
+      var selectedNet = netSelect.value;
+      var currentDesigValue = desigSelect.value;
+      while (desigSelect.options.length > 1) desigSelect.remove(1);
+      if (selectedNet && netComponentsMap[selectedNet]) {
+        var desigs = netComponentsMap[selectedNet].sort();
+        desigs.forEach(function(desig) {
+          var o = document.createElement('option');
+          o.value = desig; o.textContent = desig;
+          desigSelect.appendChild(o);
+        });
+      }
+      if (currentDesigValue && [...desigSelect.options].some(function(o) { return o.value === currentDesigValue; })) {
+        desigSelect.value = currentDesigValue;
+      }
+    }
+
+    function clearFilters(panel) {
+      if (panel === 'full') {
+        document.getElementById('filter-full-desig').value = '';
+        document.getElementById('filter-full-net').value = '';
+        applyFullFilter();
+        populateFilters(netlistData.components);
+      } else if (panel === 'conn') {
+        document.getElementById('filter-conn-desig').value = '';
+        document.getElementById('filter-conn-net').value = '';
+        applyConnFilter();
+        populateFilters(netlistData.components);
+      }
+    }
+
+    function applyFullFilter() {
+      var desig = document.getElementById('filter-full-desig').value;
+      var net = document.getElementById('filter-full-net').value;
+      var rows = fullTableRows;
+      if (desig || net) {
+        rows = fullTableRows.filter(function(r) {
+          var matchDesig = !desig || r.desig === desig;
+          var matchNet = !net || friendlyNetName(r.net) === net;
+          return matchDesig && matchNet;
+        });
+      }
+      renderGen++;
+      renderFullTableChunked(rows, renderGen);
+    }
+
+    function applyConnFilter() {
+      var desig = document.getElementById('filter-conn-desig').value;
+      var net = document.getElementById('filter-conn-net').value;
+      renderConnTableFiltered(desig, net);
+    }
+
+    document.getElementById('filter-full-desig').addEventListener('change', function() {
+      applyFullFilter();
+      updateNetsForSelectedComponent('filter-full-desig', 'filter-full-net');
+    });
+    document.getElementById('filter-full-net').addEventListener('change', function() {
+      applyFullFilter();
+      updateComponentsForSelectedNet('filter-full-net', 'filter-full-desig');
+    });
+    document.getElementById('filter-conn-desig').addEventListener('change', function() {
+      applyConnFilter();
+      updateNetsForSelectedComponent('filter-conn-desig', 'filter-conn-net');
+    });
+    document.getElementById('filter-conn-net').addEventListener('change', function() {
+      applyConnFilter();
+      updateComponentsForSelectedNet('filter-conn-net', 'filter-conn-desig');
+    });
+
+    document.getElementById('btn-clear-full-filter').addEventListener('click', function() {
+      clearFilters('full');
+    });
+    document.getElementById('btn-clear-conn-filter').addEventListener('click', function() {
+      clearFilters('conn');
+    });
+
+    // ===== 引脚映射 (Pin Mapping) =====
+    
+    // 信号名提取
+    function inferSignalName(netName) {
+      if (!netName || typeof netName !== 'string' || netName === '(悬空)') return '';
+      var prefixes = ['NET_', 'SIG_', 'PIN_', 'N_'];
+      var upper = netName.toUpperCase();
+      for (var i = 0; i < prefixes.length; i++) {
+        if (upper.indexOf(prefixes[i]) === 0) return netName.substring(prefixes[i].length);
+      }
+      return netName;
+    }
+
+    // 连接器类型分类
+    function getConnectorType(name) {
+      if (!name || typeof name !== 'string') return 'Unknown';
+      var upper = name.toUpperCase();
+      if (upper.indexOf('MOLEX') >= 0 || upper.indexOf('KK') >= 0) return 'Molex';
+      if (upper.indexOf('JST') >= 0) return 'JST';
+      if (upper.indexOf('HEADER') >= 0) return 'Header';
+      if (upper.indexOf('USB') >= 0) return 'USB';
+      return name;
+    }
+
+    // ===== 边类型常量 =====
+    var EDGE_TYPES = {
+      DIRECT: 'DIRECT',
+      THROUGH_R: 'THROUGH_R',
+      THROUGH_R_LOW: 'THROUGH_R_LOW',
+      THROUGH_R_HIGH: 'THROUGH_R_HIGH',
+      THROUGH_L: 'THROUGH_L',
+      THROUGH_FB: 'THROUGH_FB',
+      THROUGH_FUSE: 'THROUGH_FUSE',
+      BLOCKED_BY_C: 'BLOCKED_BY_C',
+      ISOLATED_BY_TRANSFORMER: 'ISOLATED_BY_TRANSFORMER',
+      ISOLATED_BY_OPTO: 'ISOLATED_BY_OPTO',
+      CONDITIONAL_BY_DIODE: 'CONDITIONAL_BY_DIODE',
+      CONDITIONAL_BY_DIODE_DIR: 'CONDITIONAL_BY_DIODE_DIR',
+      CONDITIONAL_BY_MOSFET: 'CONDITIONAL_BY_MOSFET',
+      CONDITIONAL_BY_BJT: 'CONDITIONAL_BY_BJT',
+      STOP_AT_IC: 'STOP_AT_IC',
+      DISCONNECTED: 'DISCONNECTED'
+    };
+
+    // ===== 阻值解析函数 =====
+    function parseResistorValue(valueStr) {
+      if (!valueStr || typeof valueStr !== 'string') return null;
+      var s = valueStr.trim().toUpperCase();
+      // 去掉 Ω/Ohm 后缀
+      s = s.replace(/[ΩΩ]/g, '').replace(/OHM/g, '').replace(/\s/g, '');
+      // 0Ω / 0R
+      if (s === '0' || s === '0R') return 0;
+      var num = null;
+      // MΩ
+      if (/^\d+\.?\d*M$/.test(s)) { num = parseFloat(s.replace('M', '')) * 1000000; }
+      // KΩ
+      else if (/^\d+\.?\d*K$/.test(s)) { num = parseFloat(s.replace('K', '')) * 1000; }
+      // 纯数字（Ω）
+      else if (/^\d+\.?\d*$/.test(s)) { num = parseFloat(s); }
+      // R 标记法 (4R7 = 4.7Ω)
+      else if (/^\d+R\d+$/.test(s)) { num = parseFloat(s.replace('R', '.')); }
+      // k 标记法 (4k7 = 4.7kΩ)
+      else if (/^\d+K\d+$/.test(s)) { num = parseFloat(s.replace('K', '.')) * 1000; }
+      return num;
+    }
+
+    // 根据阻值决定电阻的边类型
+    function getResistorEdgeType(desig, props) {
+      var valueStr = props.Value || props.Device_name || '';
+      var ohms = parseResistorValue(valueStr);
+      var deviceName = (props.Device_name || '').toUpperCase();
+      // 0Ω/0R/跳线 → 直连
+      if (ohms === 0 || deviceName.indexOf('0Ω') >= 0 || deviceName.indexOf('0R') >= 0 || deviceName.indexOf('JUMPER') >= 0) {
+        return EDGE_TYPES.DIRECT;
+      }
+      if (ohms !== null) {
+        if (ohms < 100) return EDGE_TYPES.THROUGH_R_LOW;   // < 100Ω: 近似连通
+        if (ohms >= 10000) return EDGE_TYPES.THROUGH_R_HIGH; // >= 10KΩ: 断路
+      }
+      // 未知阻值或 100Ω~10KΩ: 条件性连通
+      return EDGE_TYPES.THROUGH_R;
+    }
+
+    // 判断二极管引脚方向 (返回 { anodePin, cathodePin, anodeNet, cathodeNet })
+    function getDiodePinDirection(pinInfoMap) {
+      var anodePin = null, cathodePin = null;
+      for (var pn in pinInfoMap) {
+        var pinName = (pinInfoMap[pn].pinName || pinInfoMap[pn].name || '').toUpperCase();
+        if (pinName === 'A' || pinName === 'ANODE' || pinName === '1') {
+          if (!anodePin) anodePin = { pin: pn, net: normalizeNetName(pinInfoMap[pn].net), pinName: pinName };
+        }
+        if (pinName === 'K' || pinName === 'CATHODE' || pinName === 'C' || pinName === '2') {
+          if (!cathodePin) cathodePin = { pin: pn, net: normalizeNetName(pinInfoMap[pn].net), pinName: pinName };
+        }
+      }
+      return { anodePin: anodePin, cathodePin: cathodePin };
+    }
+
+    // ===== A类：直接穿透器件 =====
+    var A_TYPE_PREFIXES = {
+      'R': 'resistor',
+      'L': 'inductor',
+      'FB': 'ferrite_bead',
+      'F': 'fuse'
+    };
+
+    // ===== B类：直接阻断器件 =====
+    var B_TYPE_PREFIXES = {
+      'C': 'capacitor'
+    };
+
+    // ===== 辅助函数：获取元件前缀 =====
+    function getComponentPrefix(desig) {
+      if (!desig || typeof desig !== 'string') return '';
+      return desig.replace(/\d+$/, '').toUpperCase();
+    }
+
+    // 网络名标准化
+    function normalizeNetName(net) {
+      if (!net || typeof net !== 'string' || net === '(悬空)') return '';
+      return net.trim().toUpperCase();
+    }
+
+    // 缓存机制 - 避免重复计算
+    var graphCache = {
+      netlistStr: null,
+      data: null
+    };
+
+    function getCachedGraph(netlist) {
+      var key = JSON.stringify(netlist).slice(0, 100);
+      if (graphCache.netlistStr === key && graphCache.data) {
+        console.log('[网表] 使用缓存网络图');
+        return graphCache.data;
+      }
+      console.log('[网表] 计算新网络图');
+      var result = buildNetworkConnectivityGraph(netlist);
+      graphCache.netlistStr = key;
+      graphCache.data = result;
+      return result;
+    }
+
+    // 构建网络连通图（支持多类型桥接）- 优化版本
+    function buildNetworkConnectivityGraph(netlist) {
+      var components = netlist.components || netlist;
+      var netMap = {};
+      var bridges = [];
+      var blocking = [];
+      
+      // 收集所有网络连接
+      for (var cid in components) {
+        var comp = components[cid];
+        var props = comp.props || {};
+        var desig = props.Designator || '';
+        var pins = comp.pinInfoMap || {};
+        for (var pn in pins) {
+          var net = normalizeNetName(pins[pn].net);
+          if (!net) continue;
+          if (!netMap[net]) netMap[net] = [];
+          netMap[net].push({ desig: desig, pin: pn });
+        }
+      }
+      
+      // 识别 A 类穿透器件 (R/L/FB/F) — 电阻分级判断
+      for (var cid in components) {
+        var comp = components[cid];
+        var props = comp.props || {};
+        var desig = props.Designator || '';
+        var prefix = getComponentPrefix(desig);
+        var deviceName = (props.Device_name || '').toUpperCase();
+
+        // 检查是否是 A 类穿透器件
+        var aType = A_TYPE_PREFIXES[prefix];
+        if (aType || deviceName.indexOf('0Ω') >= 0 || deviceName.indexOf('0R') >= 0 || deviceName.indexOf('JUMPER') >= 0) {
+          var pins = comp.pinInfoMap || {};
+          var nets = [];
+          for (var pn in pins) {
+            var net = normalizeNetName(pins[pn].net);
+            if (net) nets.push(net);
+          }
+          if (nets.length >= 2 && nets[0] !== nets[1]) {
+            var edgeType;
+            if (prefix === 'R') {
+              // 电阻分级判断
+              edgeType = getResistorEdgeType(desig, props);
+            } else if (prefix === 'L') {
+              edgeType = EDGE_TYPES.THROUGH_L;
+            } else if (prefix === 'FB') {
+              edgeType = EDGE_TYPES.THROUGH_FB;
+            } else if (prefix === 'F') {
+              edgeType = EDGE_TYPES.THROUGH_FUSE;
+            } else {
+              edgeType = EDGE_TYPES.DIRECT;
+            }
+            bridges.push({
+              desig: desig,
+              netA: nets[0],
+              netB: nets[1],
+              type: aType || 'jumper',
+              edgeType: edgeType,
+              value: props.Value || ''
+            });
+          }
+        }
+      }
+
+      // 识别二极管 (D) — 通过 pinName 判断方向
+      for (var cid in components) {
+        var comp = components[cid];
+        var props = comp.props || {};
+        var desig = props.Designator || '';
+        var prefix = getComponentPrefix(desig);
+
+        if (prefix === 'D') {
+          var dirInfo = getDiodePinDirection(comp.pinInfoMap || {});
+          if (dirInfo.anodePin && dirInfo.cathodePin && dirInfo.anodePin.net && dirInfo.cathodePin.net) {
+            if (dirInfo.anodePin.net !== dirInfo.cathodePin.net) {
+              bridges.push({
+                desig: desig,
+                netA: dirInfo.anodePin.net,
+                netB: dirInfo.cathodePin.net,
+                type: 'diode_dir',
+                edgeType: EDGE_TYPES.CONDITIONAL_BY_DIODE_DIR,
+                value: props.Value || '',
+                anodePin: dirInfo.anodePin.pin,
+                cathodePin: dirInfo.cathodePin.pin,
+                anodeNet: dirInfo.anodePin.net,
+                cathodeNet: dirInfo.cathodePin.net
+              });
+            }
+          } else {
+            // 无 pinName 信息，保留旧逻辑（条件双向）
+            var pins2 = comp.pinInfoMap || {};
+            var nets2 = [];
+            for (var pn2 in pins2) {
+              var net2 = normalizeNetName(pins2[pn2].net);
+              if (net2) nets2.push(net2);
+            }
+            if (nets2.length >= 2 && nets2[0] !== nets2[1]) {
+              bridges.push({
+                desig: desig,
+                netA: nets2[0],
+                netB: nets2[1],
+                type: 'diode',
+                edgeType: EDGE_TYPES.CONDITIONAL_BY_DIODE,
+                value: props.Value || ''
+              });
+            }
+          }
+        }
+      }
+
+      // 识别三极管/MOSFET (Q) — 条件性连通，不加入 Union-Find
+      for (var cid in components) {
+        var comp = components[cid];
+        var props = comp.props || {};
+        var desig = props.Designator || '';
+        var prefix = getComponentPrefix(desig);
+
+        if (prefix === 'Q') {
+          var pins3 = comp.pinInfoMap || {};
+          var nets3 = [];
+          for (var pn3 in pins3) {
+            var net3 = normalizeNetName(pins3[pn3].net);
+            if (net3) nets3.push(net3);
+          }
+          if (nets3.length >= 2) {
+            // Q 的各引脚网络之间为条件性连通
+            for (var qi = 0; qi < nets3.length; qi++) {
+              for (var qj = qi + 1; qj < nets3.length; qj++) {
+                if (nets3[qi] !== nets3[qj]) {
+                  bridges.push({
+                    desig: desig,
+                    netA: nets3[qi],
+                    netB: nets3[qj],
+                    type: 'bjt',
+                    edgeType: EDGE_TYPES.CONDITIONAL_BY_BJT,
+                    value: props.Value || ''
+                  });
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // 识别 B 类阻断器件 (C 电容)
+      for (var cid in components) {
+        var comp = components[cid];
+        var props = comp.props || {};
+        var desig = props.Designator || '';
+        var prefix = getComponentPrefix(desig);
+        
+        if (prefix === 'C') {
+          var pins = comp.pinInfoMap || {};
+          var nets = [];
+          for (var pn in pins) {
+            var net = normalizeNetName(pins[pn].net);
+            if (net) nets.push(net);
+          }
+          if (nets.length >= 2 && nets[0] !== nets[1]) {
+            blocking.push({
+              desig: desig,
+              type: 'capacitor',
+              netA: nets[0],
+              netB: nets[1],
+              edgeType: EDGE_TYPES.BLOCKED_BY_C
+            });
+          }
+        }
+      }
+      
+      // 并查集构建连通图 — 只有确定性连通才加入 Union-Find
+      var parent = {};
+      for (var net in netMap) { if (!parent[net]) parent[net] = net; }
+      for (var bridge of bridges) {
+        // 条件性连通和断路性桥接不加入 Union-Find
+        if (bridge.edgeType === EDGE_TYPES.THROUGH_R_HIGH ||
+            bridge.edgeType === EDGE_TYPES.CONDITIONAL_BY_DIODE ||
+            bridge.edgeType === EDGE_TYPES.CONDITIONAL_BY_DIODE_DIR ||
+            bridge.edgeType === EDGE_TYPES.CONDITIONAL_BY_BJT ||
+            bridge.edgeType === EDGE_TYPES.BLOCKED_BY_C ||
+            bridge.edgeType === EDGE_TYPES.STOP_AT_IC ||
+            bridge.edgeType === EDGE_TYPES.ISOLATED_BY_TRANSFORMER ||
+            bridge.edgeType === EDGE_TYPES.ISOLATED_BY_OPTO) {
+          continue;
+        }
+        if (!parent[bridge.netA]) parent[bridge.netA] = bridge.netA;
+        if (!parent[bridge.netB]) parent[bridge.netB] = bridge.netB;
+        union(bridge.netA, bridge.netB);
+      }
+      
+      function find(x) {
+        if (!parent[x]) parent[x] = x;
+        return parent[x] === x ? x : (parent[x] = find(parent[x]));
+      }
+      
+      function union(a, b) {
+        var ra = find(a), rb = find(b);
+        if (ra !== rb) parent[ra] = rb;
+      }
+      
+      for (var bridge of bridges) {
+        union(bridge.netA, bridge.netB);
+      }
+      
+      // BFS 查找桥接路径（返回边类型）
+      function findBridgePath(netA, netB) {
+        netA = normalizeNetName(netA);
+        netB = normalizeNetName(netB);
+        if (!netA || !netB) return { connected: false, edges: [], edgeType: null };
+        if (netA === netB) return { connected: true, edges: [], edgeType: EDGE_TYPES.DIRECT };
+        
+        var visited = {};
+        var queue = [{ net: netA, edges: [] }];
+        visited[netA] = true;
+        
+        while (queue.length > 0) {
+          var current = queue.shift();
+          
+          for (var bridge of bridges) {
+            var nextNet = null;
+            var newEdges = null;
+            
+            if (bridge.netA === current.net) {
+              nextNet = bridge.netB;
+              newEdges = [...current.edges, bridge];
+            } else if (bridge.netB === current.net) {
+              nextNet = bridge.netA;
+              newEdges = [...current.edges, bridge];
+            }
+            
+            if (nextNet && !visited[nextNet]) {
+              if (nextNet === netB) {
+                var lastEdge = newEdges[newEdges.length - 1];
+                return { connected: true, edges: newEdges, edgeType: lastEdge ? lastEdge.edgeType : EDGE_TYPES.DIRECT };
+              }
+              visited[nextNet] = true;
+              queue.push({ net: nextNet, edges: newEdges });
+            }
+          }
+        }
+        
+        return { connected: false, edges: [], edgeType: null };
+      }
+      
+      // 检查两个网络间是否有 B 类阻断器件
+      function isBlockedBy(netA, netB) {
+        netA = normalizeNetName(netA);
+        netB = normalizeNetName(netB);
+        if (!netA || !netB) return false;
+        for (var i = 0; i < blocking.length; i++) {
+          var b = blocking[i];
+          if ((b.netA === netA && b.netB === netB) || (b.netA === netB && b.netB === netA)) {
+            return true;
+          }
+        }
+        return false;
+      }
+      
+      // 获取连接类型
+      function getConnectionType(netA, netB) {
+        netA = normalizeNetName(netA);
+        netB = normalizeNetName(netB);
+        if (!netA || !netB) return { connected: false, edgeType: EDGE_TYPES.DISCONNECTED };
+        
+        if (netA === netB) return { connected: true, edgeType: EDGE_TYPES.DIRECT };
+        
+        var path = findBridgePath(netA, netB);
+        if (path.connected) return { connected: true, edgeType: path.edgeType };
+        
+        if (isBlockedBy(netA, netB)) return { connected: false, edgeType: EDGE_TYPES.BLOCKED_BY_C };
+        
+        return { connected: false, edgeType: EDGE_TYPES.DISCONNECTED };
+      }
+      
+      // 获取路径信息：检查路径是否经过电源/地网络（限制追踪深度）
+      function getPathInfo(netA, netB) {
+        netA = normalizeNetName(netA);
+        netB = normalizeNetName(netB);
+
+        var result = {
+          passesThroughPower: false,
+          passesThroughGnd: false,
+          pathNets: [],
+          connected: false
+        };
+
+        if (!netA || !netB) return result;
+
+        // 网络名相同，直接返回
+        if (netA === netB) {
+          result.connected = true;
+          result.pathNets = [netA];
+          return result;
+        }
+
+        // BFS 遍历，限制深度为1跳（只检查直接连接）
+        var visited = {};
+        var queue = [{ net: netA, path: [netA], depth: 0 }];
+        visited[netA] = true;
+
+        while (queue.length > 0) {
+          var current = queue.shift();
+
+          // 找到目标
+          if (current.net === netB) {
+            result.connected = true;
+            result.pathNets = current.path;
+            break;
+          }
+
+          // 【新增】限制深度，只追踪1跳
+          if (current.depth >= 1) continue;
+
+          // 遍历桥接
+          for (var bridge of bridges) {
+            var nextNet = null;
+            if (bridge.netA === current.net && !visited[bridge.netB]) {
+              nextNet = bridge.netB;
+            } else if (bridge.netB === current.net && !visited[bridge.netA]) {
+              nextNet = bridge.netA;
+            }
+
+            if (nextNet && !visited[nextNet]) {
+              visited[nextNet] = true;
+              var newPath = current.path.concat([nextNet]);
+              queue.push({ net: nextNet, path: newPath, depth: current.depth + 1 });
+            }
+          }
+        }
+
+        // 检查路径中的网络是否是电源/地
+        for (var i = 0; i < result.pathNets.length; i++) {
+          var netName = result.pathNets[i];
+          // 跳过起点和终点（因为它们可能是信号网络）
+          if (i > 0 && i < result.pathNets.length - 1) {
+            if (isPwrNet(netName)) result.passesThroughPower = true;
+            if (isGndNet(netName)) result.passesThroughGnd = true;
+          }
+        }
+
+        return result;
+      }
+      
+      // 递归检查某个网络最终连接到电源还是地（限制递归深度避免过度追踪）
+      function getNetDestinationType(netName, visited, depth) {
+        if (!netName) return 'signal';
+
+        // 限制递归深度，只追踪1跳
+        if (depth !== undefined && depth >= 1) return 'signal';
+
+        visited = visited || {};
+        if (visited[netName]) return 'signal';
+        visited[netName] = true;
+
+        // 自身是电源/地
+        if (isPwrNet(netName)) return 'power';
+        if (isGndNet(netName)) return 'gnd';
+
+        // 遍历该网络通过桥接能到达的其他网络
+        var result = 'signal';
+
+        for (var bridge of bridges) {
+          var nextNet = null;
+          if (bridge.netA === netName && !visited[bridge.netB]) {
+            nextNet = bridge.netB;
+          } else if (bridge.netB === netName && !visited[bridge.netA]) {
+            nextNet = bridge.netA;
+          }
+
+          if (nextNet) {
+            // 传递 depth 参数，限制递归深度
+            var destType = getNetDestinationType(nextNet, visited, (depth || 0) + 1);
+            // 电源优先
+            if (destType === 'power') return 'power';
+            else if (destType === 'gnd' && result !== 'power') result = 'gnd';
+          }
+        }
+
+        return result;
+      }
+      
+      return { 
+        netMap, 
+        bridges, 
+        blocking,
+        findBridgePath, 
+        getPathInfo: getPathInfo,
+        getNetDestinationType: getNetDestinationType,
+        isConnected: function(netA, netB) {
+          return getConnectionType(netA, netB).connected;
+        },
+        getConnectionType: getConnectionType
+      };
+    }
+
+    // ===== 三层电源网识别 =====
+
+    // 第一层：排除表（这些名称不是电源，优先级最高）
+    // 注意：移除 VSS/VEE，它们是常见地/负电源，不是控制信号
+    var _pwrExcludeSet = {'EN':1,'ENABLE':1,'SHDN':1,'SHUTDOWN':1,'PGOOD':1,'PWROK':1,'POR':1,
+      'UVLO':1,'OVLO':1,'ILIM':1,'MODE':1,'SYNC':1,'SS':1,'TRACK':1,'COMP':1,
+      'FB':1,'VFB':1,'SENSE':1,'VSENSE':1,'ISENSE':1,'CS':1,'CSP':1,'CSN':1,
+      'SW':1,'LX':1,'PH':1,'PHASE':1,'BOOT':1,'BST':1,'HGATE':1,'LGATE':1,
+      'GATE':1,'DRV':1,'BSTCAP':1,'VREF':1,'VCM':1,'VMID':1,'MID':1,'NTC':1};
+
+    // 地网精确名单（扩展版）
+    var _gndExactSet = {'GND':1,'GROUND':1,'0V':1,'COM':1,'COMMON':1,
+      'AGND':1,'DGND':1,'PGND':1,'SGND':1,'LGND':1,'EGND':1,'FGND':1,'MGND':1,'CGND':1,
+      'CHASSIS':1,'CHASSIS_GND':1,'FRAME_GND':1,'SHIELD':1,'SHIELD_GND':1,'CASE_GND':1,
+      'EARTH':1,'PE':1,'FG':1,'FRAME':1,'PROTECTIVE_EARTH':1,
+      'SIGNAL_GND':1,'POWER_GND':1,'ANALOG_GND':1,'DIGITAL_GND':1,
+      'GND_SENSE':1,'AGND_SENSE':1,'PGND_SENSE':1,'STAR_GND':1,
+      'GND1':1,'GND2':1,'GND3':1,'GND4':1,'GND5':1,
+      'GND_A':1,'GND_D':1,'GND_P':1,'GND_MCU':1,'GND_CPU':1,
+      'GND_USB':1,'GND_HDMI':1,'GND_ETH':1,'GND_SD':1,'GND_RF':1,
+      'GND_PLL':1,'GND_ADC':1,'GND_DAC':1,'GND_RTC':1};
+
+    // 电源网精确名单（扩展版 - 包含电压值变体）
+    var _pwrExactSet = {'VCC':1,'VDD':1,'VEE':1,'VSS':1,'VAA':1,'VPP':1,'VBUS':1,'VIN':1,'VOUT':1,
+      'VSYS':1,'VMAIN':1,'VPWR':1,'PWR':1,'POWER':1,
+      'VBAT':1,'VBATT':1,'BAT':1,'BATT':1,'BATTERY':1,'BPLUS':1,'RAW':1,'RAW_IN':1,
+      'DCIN':1,'DC_IN':1,'ACIN':1,'AC_IN':1,'ADP':1,'ADAPTER':1,'EXT_PWR':1,'MAIN_PWR':1,'SYS_PWR':1,
+      'VCORE':1,'VCPU':1,'VGPU':1,'VIO':1,'VDDIO':1,'VCCIO':1,'VCCA':1,'VCCD':1,'VDDA':1,'VDDD':1,
+      'AVDD':1,'DVDD':1,'AVCC':1,'DVCC':1,'PVDD':1,'CVDD':1,'IVDD':1,'OVDD':1,
+      'VPHY':1,'VPLL':1,'VCCAUX':1,'VCCINT':1,'VCCBRAM':1,'VCCADC':1,'VCCDAC':1,
+      'VANA':1,'VDIG':1,'VLOGIC':1,'VAUX':1,'VRTC':1,'VBACKUP':1,'VBKUP':1,
+      'VSTBY':1,'VSTANDBY':1,'VALW':1,'VAON':1,'VBIAS':1,'VREG':1,'VINT':1,
+      'VDDQ':1,'VTT':1,'VTERM':1,'VPP_DDR':1,'VREF_DDR':1,
+      'USB_VBUS':1,'USB_5V':1,'USB_PWR':1,'TYPEC_VBUS':1,'USBC_VBUS':1,'OTG_VBUS':1,
+      'POE_VIN':1,'POE_48V':1,'HDMI_5V':1,'PCIE_12V':1,'M2_3V3':1,'SD_VDD':1,
+      'VDD_CORE':1,'VDD_CPU':1,'VDD_SOC':1,'VDD_ARM':1,'VDD_GPU':1,'VDD_DRAM':1,'VDD_DDR':1,
+      'VCC_A':1,'VCC_D':1,'VDDA_ADC':1,'VDDA_DAC':1,'AVDDH':1,'AVDDL':1,'DVDDH':1,'DVDDL':1,
+      'VDD_TX':1,'VDD_RX':1,'VDD_SERDES':1,'VDD_PCIE':1,'VDD_USB':1,'VDD_MIPI':1,'VDD_HDMI':1,
+      'VDD_ETH':1,'VDD_PHY':1,'VDD_SATA':1,'VDD_PLL':1,'VDD_DDR':1,
+      'VIN_SYS':1,'VIN_MAIN':1,'VIN_AUX':1,'VIN_12V':1,'VIN_24V':1,
+      'USB_VBUS':1,'VBUS_5V':1,'RTC_BAT':1,'COIN_BAT':1,'BACKUP_BAT':1,
+      'VMINUS':1,'VNEG':1,'VNN':1,'VN':1,'VEE':1,
+      'VCCINT':1,'VCCAUX':1,'VCCO':1,'VCC_BRAM':1,'VCC_PLL':1,'VCC_IO':1,
+      'VVCC':1,'VVDD':1,
+      // 常见电压值格式
+      '3V3':1,'5V':1,'12V':1,'1V8':1,'2V5':1,'1V2':1,'1V0':1,'1V1':1,'1V5':1,'1V65':1,'1V8V':1,
+      '3V':1,'5V0':1,'9V':1,'15V':1,'18V':1,'24V':1,'48V':1,
+      'V3V3':1,'V5V':1,'V12V':1,'V1V8':1,'V2V5':1,'V1V2':1,'V1V0':1,'V3V':1,'V5V0':1,
+      'VCC_3V3':1,'VCC_5V':1,'VCC_3V':1,'VCC_12V':1,'VCC_1V8':1,'VCC_2V5':1,
+      'VDD_3V3':1,'VDD_5V':1,'VDD_3V':1,'VDD_1V8':1,'VDD_2V5':1,'VDD_1V2':1,
+      'AVDD_3V3':1,'AVDD_5V':1,'DVDD_3V3':1,'DVDD_5V':1,
+      '3V3_SYS':1,'3V3_MAIN':1,'3V3_AUX':1,'3V3_USB':1,'3V3_SD':1,'3V3_RTC':1,
+      '5V_SYS':1,'5V_MAIN':1,'5V_AUX':1,'5V_USB':1,'12V_SYS':1,'12V_MAIN':1,
+      'V3V3_PLL':1,'V3V3_ADC':1,'V3V3_DAC':1,'V3V3_USB':1,'V3V3_ETH':1,'V3V3_SD':1,
+      'V5V_USB':1,'V5V_CHARGE':1,'V12V_ADC':1,'V1V8_PLL':1,'V1V8_RF':1,'V1V8_SD':1,
+      '3V3A':1,'3V3D':1,'3V3_P':1,'3V3_N':1,'5V_P':1,'5V_N':1,
+      'VM':1,'VP':1,'VCCM':1,'VDDM':1,'VPOS':1,'VNEG':1};
+
+    // 排除词：去掉非字母数字后精确匹配
+    function _isExcluded(u) {
+      var stripped = u.replace(/[^A-Z0-9]/g, '');
+      return !!_pwrExcludeSet[stripped];
+    }
+
+    // 判断是否为地网络
+    function isGndNet(net) {
+      if (!net || typeof net !== 'string') return false;
+      var u = net.trim().toUpperCase();
+      if (!u || u === '(悬空)') return false;
+      if (_isExcluded(u)) return false;
+      if (_gndExactSet[u]) return true;
+      // 含有 GND 分词的（_GND、GND_、-GND-、GND本身）
+      if (/(?:^|[_\-])GND(?:[_\-]|$)/.test(u) || u === 'GND') return true;
+      // AGND/DGND/PGND/SGND 开头
+      if (/^[ADPSLMECF]GND/.test(u)) return true;
+      // CHASSIS/EARTH/PE/SHIELD 开头
+      if (/^(CHASSIS|EARTH|FRAME_GND|SHIELD_GND|CASE_GND|PROTECTIVE)/.test(u)) return true;
+      return false;
+    }
+
+    // 判断是否为非地类电源网络
+    function isPwrNet(net) {
+      if (!net || typeof net !== 'string') return false;
+      var u = net.trim().toUpperCase();
+      if (!u || u === '(悬空)') return false;
+      if (_isExcluded(u)) return false;
+      if (isGndNet(net)) return false; // 地不算电源
+      if (_pwrExactSet[u]) return true;
+
+      // 规则匹配：纯电压值（3V3, 5V, 1V8, 12V, 1P8V, V3P3, +3V3, -5V...）
+      if (/^[+\-]?\d+V\d*$/.test(u)) return true;
+      if (/^[+\-]?\d+P\d+V$/.test(u)) return true;
+      if (/^V\d+P\d+$/.test(u)) return true;
+      if (/^P\d+V\d*$/.test(u)) return true;
+
+      // VCC/VDD/VEE/VSS/VIN/VOUT/VBAT/VBUS/VSYS/AVDD/DVDD/VCORE/VIO 开头
+      if (/^(VCC|VDD|VEE|VSS|VIN|VOUT|VBAT|VBUS|VSYS|AVDD|DVDD|PVDD|VCORE|VIO|VDDA|VDDD|VCCA|VCCD|VDDIO|VCCIO|VANA|VDIG|VAUX|VRTC|VSTBY|VALW|VAON|VPWR|VMAIN|VPLL|VPHY|VREF_|VANA_|VDIG_|VAUX_|VLOGIC_|VBIAS_|VREG_)(_|$)/.test(u)) return true;
+
+      // 带电源后缀
+      if (/(_PWR|_POWER|_SUPPLY|_RAIL|_MAIN|_SYS|_AON|_ALW|_STBY|_RTC|_CORE|_CPU|_GPU|_SOC|_DDR|_PLL|_ADC|_DAC|_USB|_ETH|_HDMI|_SD|_MIPI|_PCIE|_SATA|_SERDES|_RX|_TX|_PHY|_CAM|_LCD|_MOTOR|_FAN|_BACKLIGHT)(_|$)/.test(u)) return true;
+
+      // 数字电压值后跟下划线（3V3_SYS, 5V_MAIN, 12V_IN, 3V3_PLL, 3V3_ADC）
+      if (/^[+\-]?\d+V\d*_/.test(u)) return true;
+
+      // 常见前缀 + 电压值（SYS_3V3, USB_5V, DDR_VDDQ）
+      if (/^(SYS|MAIN|AUX|PWR|PSU|REG|LDO|BUCK|BOOST|USB|DDR|FPGA|MCU|SOC|CPU|GPU|IO|ANA|DIG|MIPI|PCIE|SATA|HDMI|ETH|USB_|UART_|SPI_|I2C_)_\d+V/.test(u)) return true;
+
+      // 状态后缀电源（3V3_S0, 5V_S3）
+      if (/^[+\-]?\d+V\d*_S[0-9]$/.test(u)) return true;
+
+      // 小数点电压格式 (3.3V, 5.0V, 1.8V, 2.5V, 1.2V)
+      if (/^\d+\.\d+V$/.test(u)) return true;
+
+      // V开头+电压值格式 (V3V3, V5V, V12V, V1V8, V2V5)
+      if (/^V\d+V\d*$/.test(u)) return true;
+      // VCC_VDD 等复合格式
+      if (/^(VCC|VDD|AVDD|DVDD|VCCA|VCCD)_\d+V/.test(u)) return true;
+      
+      // 常见电源后缀前缀组合 (3V3_USB, 5V_CHARGE, 12V_ADC)
+      if (/^(3V3|5V|12V|1V8|2V5|1V2|3V)_/.test(u)) return true;
+
+      // 扩展前缀检测 (VCCM, VDDM, VM, VP, VPOS, VNEG 等)
+      if (/^(VM|VP|VCCM|VDDM|VPOS|VNEG_|VCC_P|VDD_P|VCC_N|VDD_N)(_|$)/.test(u)) return true;
+
+      return false;
+    }
+
+    // 判断是否为电源/地网络（对外接口，兼容原有调用）
+    function isPowerNet(net) {
+      return isGndNet(net) || isPwrNet(net);
+    }
+
+    // 扩展识别范围：包含的前缀
+    var validPrefixes = [
+      // 连接器
+      'J', 'CN', 'P', 'X', 'USB', 'HDR', 'CONN',
+      // 端子排/接线
+      'TB', 'TRM',
+      // 电池/电源
+      'BT', 'BAT', 'CELL',
+      // 天线/射频
+      'ANT', 'RF',
+      // 开关/跳线
+      'SW', 'JP', 'DIP',
+      // 板卡/模组
+      'BRD', 'MOD', 'SUB',
+      // IC/芯片
+      'U', 'IC',
+      // 外部设备
+      'FAN', 'MOT', 'LCD', 'CAM', 'SENS', 'SPK', 'MIC'
+    ];
+
+    // 排除的前缀
+    var excludePrefixes = ['R', 'C', 'L', 'D', 'Y', 'Q', 'FB', 'TP', 'MH', 'H', 'K', 'T'];
+
+    // 排除的器件名称关键词
+    var excludeKeywords = [
+      'capacitor', 'cap ', 'resistor', 'res ', 'inductor', 'ind ',
+      'crystal', 'oscillator', 'osc ', 'ceramic', 'tantalum',
+      'diode', 'led ', 'mosfet', 'transistor', 'ferrite',
+      'bead', 'filter', 'decoupling', 'bypass'
+    ];
+
+    // 外部对象关键词
+    var externalKeywords = [
+      'board', 'module', 'panel', 'display', 'sensor',
+      'motor', 'fan', 'battery', 'adapter', 'antenna',
+      'camera', 'encoder', 'heater', 'backlight', 'connector',
+      'header', 'socket', 'terminal', 'jtag', 'swd',
+      'uart', 'can ', 'rs485', 'ethernet', 'usb ',
+      'front panel', 'rear panel', 'interface'
+    ];
+
+    // 检查是否被关键词排除
+    function isExcludedByKeyword(name) {
+      if (!name || typeof name !== 'string') return false;
+      var lower = name.toLowerCase();
+      return excludeKeywords.some(function(kw) { return lower.indexOf(kw) >= 0; });
+    }
+
+    // 检查是否为外部对象
+    function isExternalObject(comp) {
+      if (!comp) return false;
+      var props = comp.props || {};
+      var name = (props.Device_name || '');
+      if (typeof name !== 'string') return false;
+      name = name.toLowerCase();
+      return externalKeywords.some(function(kw) { return name.indexOf(kw) >= 0; });
+    }
+
+    // 提取所有连接器配对（扩展识别范围）
+    function extractConnectorPairs(netlist) {
+      var components = netlist.components || netlist;
+      var connectors = [];
+      
+      for (var cid in components) {
+        var comp = components[cid];
+        var props = comp.props || {};
+        var desig = props.Designator || '';
+        var prefix = desig.replace(/\d+$/, '').toUpperCase();
+        
+        // 检查是否在排除列表中
+        if (excludePrefixes.indexOf(prefix) >= 0) continue;
+        
+        // 检查器件名称是否排除
+        if (isExcludedByKeyword(props.Device_name || '')) continue;
+        
+        // 检查是否在包含列表中（前缀或关键词）
+        var isIncluded = validPrefixes.indexOf(prefix) >= 0 || isExternalObject(comp);
+        
+        if (isIncluded) {
+          var pinCount = Object.keys(comp.pinInfoMap || {}).length;
+          if (pinCount >= 2) {
+            connectors.push({
+              id: cid,
+              desig: desig,
+              type: getConnectorType(props.Device_name || ''),
+              pins: comp.pinInfoMap || {},
+              props: props
+            });
+          }
+        }
+      }
+      
+      // 生成所有可能的配对（不使用 used 标记，排除电源/地）
+      // 先构建网络连通图（包含多类型桥接）
+      var graph = getCachedGraph(netlist);
+      
+      var pairs = [];
+      var pathCache = {};
+
+      for (var i = 0; i < connectors.length; i++) {
+        for (var j = i + 1; j < connectors.length; j++) {
+          var shared = 0;
+          var sharedDetails = [];
+          for (var pn in connectors[i].pins) {
+            var netA = normalizeNetName(connectors[i].pins[pn].net);
+            if (!netA || isPowerNet(netA)) continue;
+            if (connectors[j].pins) {
+              for (var rp in connectors[j].pins) {
+                var netB = normalizeNetName(connectors[j].pins[rp].net);
+                if (!netB || isPowerNet(netB)) continue;
+                
+                var connType;
+                if (netA === netB) {
+                  connType = { connected: true, edgeType: EDGE_TYPES.DIRECT };
+                } else {
+                  var cacheKey = netA < netB ? netA + '|' + netB : netB + '|' + netA;
+                  if (cacheKey in pathCache) {
+                    connType = pathCache[cacheKey];
+                  } else {
+                    connType = graph.getConnectionType(netA, netB);
+                    pathCache[cacheKey] = connType;
+                  }
+                }
+                
+                if (connType.connected) {
+                  // 判断网络类型：原始终点优先
+                  var actualNetType = 'signal';
+
+                  // 1. 首先检查端点本身（最高优先级）
+                  if (isGndNet(netA) || isGndNet(netB)) {
+                    actualNetType = 'gnd';
+                  } else if (isPwrNet(netA) || isPwrNet(netB)) {
+                    actualNetType = 'power';
+                  } else if (netA !== netB && graph && typeof graph.getPathInfo === 'function') {
+                    // 2. 检查路径
+                    var pathInfo = graph.getPathInfo(netA, netB);
+                    if (pathInfo.connected) {
+                      if (pathInfo.passesThroughPower) actualNetType = 'power';
+                      else if (pathInfo.passesThroughGnd) actualNetType = 'gnd';
+                    }
+
+                    // 3. 额外检查：端点本身能递归到达什么类型（仅当路径未确定时）
+                    if (actualNetType === 'signal' && graph && typeof graph.getNetDestinationType === 'function') {
+                      var destA = graph.getNetDestinationType(netA);
+                      var destB = graph.getNetDestinationType(netB);
+                      if (destA === 'power' || destB === 'power') actualNetType = 'power';
+                      else if (destA === 'gnd' || destB === 'gnd') actualNetType = 'gnd';
+                    }
+                  }
+
+                  // 所有连接类型都计入 shared（包括GND）
+                  shared++;
+                  sharedDetails.push({
+                    leftPin: pn,
+                    rightPin: rp,
+                    edgeType: connType.edgeType,
+                    net: netA,
+                    netType: actualNetType
+                  });
+                  break;
+                }
+              }
+            }
+          }
+          if (shared >= 1) {
+            pairs.push({
+              id: connectors[i].desig + '_' + connectors[j].desig,
+              displayName: connectors[i].desig + ' ↔ ' + connectors[j].desig,
+              left: connectors[i],
+              right: connectors[j],
+              sharedCount: shared,
+              sharedDetails: sharedDetails
+            });
+          }
+        }
+      }
+      
+      // 按共享网络数排序（多的在前）
+      pairs.sort(function(a, b) { return b.sharedCount - a.sharedCount; });
+      
+      return pairs;
+    }
+
+    // 构建引脚映射（支持电源/地/信号三种类型）
+    function buildPinMapping(left, right, graph) {
+      var mapping = [];
+      if (!left || !right || !left.pins || !right.pins) return mapping;
+      
+      var leftPins = Object.keys(left.pins).sort(function(a,b){var na=parseInt(a),nb=parseInt(b);if(!isNaN(na)&&!isNaN(nb))return na-nb;return a.localeCompare(b);});
+      var rightPins = Object.keys(right.pins).sort(function(a,b){var na=parseInt(a),nb=parseInt(b);if(!isNaN(na)&&!isNaN(nb))return na-nb;return a.localeCompare(b);});
+      
+      for (var li = 0; li < leftPins.length; li++) {
+        var lp = leftPins[li];
+        var leftNet = normalizeNetName(left.pins[lp].net);
+        if (!leftNet) continue;
+        
+        for (var ri = 0; ri < rightPins.length; ri++) {
+          var rp = rightPins[ri];
+          var rightNet = normalizeNetName(right.pins[rp].net);
+          if (!rightNet) continue;
+          
+          var edgeType = null;
+          var isConnected = false;
+          var netType = 'signal';
+          
+          // 判断网络类型：原始终点优先
+          // 1. 首先检查端点本身（最高优先级）
+          if (isGndNet(leftNet) || isGndNet(rightNet)) {
+            netType = 'gnd';
+          } else if (isPwrNet(leftNet) || isPwrNet(rightNet)) {
+            netType = 'power';
+          } else if (graph && typeof graph.getPathInfo === 'function' && leftNet !== rightNet) {
+            // 2. 端点都不是电源/地，检查路径是否经过电源/地
+            var pathInfo = graph.getPathInfo(leftNet, rightNet);
+            if (pathInfo.connected) {
+              if (pathInfo.passesThroughPower) {
+                netType = 'power';
+              } else if (pathInfo.passesThroughGnd) {
+                netType = 'gnd';
+              }
+            }
+            
+            // 3. 额外检查：端点本身能递归到达什么类型（仅当路径未确定时）
+            if (netType === 'signal' && graph && typeof graph.getNetDestinationType === 'function') {
+              var destLeft = graph.getNetDestinationType(leftNet);
+              var destRight = graph.getNetDestinationType(rightNet);
+              if (destLeft === 'power' || destRight === 'power') netType = 'power';
+              else if (destLeft === 'gnd' || destRight === 'gnd') netType = 'gnd';
+            }
+          }
+          
+          // 检查连接类型
+          if (graph && typeof graph.getConnectionType === 'function') {
+            var connType = graph.getConnectionType(leftNet, rightNet);
+            isConnected = connType.connected;
+            edgeType = connType.edgeType;
+            // 大阻值电阻视为断路，不加入映射
+            if (edgeType === EDGE_TYPES.THROUGH_R_HIGH) {
+              isConnected = false;
+              edgeType = EDGE_TYPES.DISCONNECTED;
+            }
+          } else {
+            // 兼容旧版
+            if (leftNet === rightNet) {
+              isConnected = true;
+              edgeType = EDGE_TYPES.DIRECT;
+            }
+          }
+           
+          // 移除重复的路径检查逻辑（已合并到上面）
+           
+          if (isConnected) {
+            mapping.push({
+              leftPin: lp,
+              rightPin: rp,
+              signal: inferSignalName(leftNet),
+              net: leftNet,
+              rightNet: rightNet,
+              netType: netType,
+              edgeType: edgeType,
+              leftPinName: (left.pins[lp].pinName || left.pins[lp].name || '').toUpperCase(),
+              rightPinName: (right.pins[rp].pinName || right.pins[rp].name || '').toUpperCase()
+            });
+          }
+        }
+      }
+      
+      // 端口名筛查：根据端口名筛选不合理的连接
+      var filteredMapping = [];
+      for (var mi = 0; mi < mapping.length; mi++) {
+        var conn = mapping[mi];
+        var keep = true;
+        
+        // 检查左侧端口名与网络类型的匹配
+        if (conn.leftPinName) {
+          var isLeftPinPwr = isPwrNet(conn.leftPinName);
+          var isLeftPinGnd = isGndNet(conn.leftPinName);
+          // 端口名是电源，但实际网络是 GND → 删除
+          if (isLeftPinPwr && conn.netType === 'gnd') keep = false;
+          // 端口名是 GND，但实际网络是电源 → 删除
+          if (isLeftPinGnd && conn.netType === 'power') keep = false;
+        }
+        
+        // 检查右侧端口名与网络类型的匹配
+        if (keep && conn.rightPinName) {
+          var isRightPinPwr = isPwrNet(conn.rightPinName);
+          var isRightPinGnd = isGndNet(conn.rightPinName);
+          // 端口名是电源，但实际网络是 GND → 删除
+          if (isRightPinPwr && conn.netType === 'gnd') keep = false;
+          // 端口名是 GND，但实际网络是电源 → 删除
+          if (isRightPinGnd && conn.netType === 'power') keep = false;
+        }
+        
+        // 检查两个网络本身
+        if (keep) {
+          var leftIsPwr = isPwrNet(conn.net);
+          var leftIsGnd = isGndNet(conn.net);
+          var rightIsPwr = isPwrNet(conn.rightNet);
+          var rightIsGnd = isGndNet(conn.rightNet);
+
+          // 如果一个网络是 GND，另一个是电源，删除该连接
+          if ((leftIsGnd && rightIsPwr) || (leftIsPwr && rightIsGnd)) {
+            keep = false;
+          }
+
+          // 【新增】如果一个网络是 GND，另一个是信号，删除该连接
+          if ((leftIsGnd && !rightIsGnd && !rightIsPwr) ||
+              (!leftIsGnd && !leftIsPwr && rightIsGnd)) {
+            keep = false;
+          }
+
+          // 【新增】如果一个网络是电源，另一个是信号，删除该连接
+          if ((leftIsPwr && !rightIsGnd && !rightIsPwr) ||
+              (!leftIsGnd && !leftIsPwr && rightIsPwr)) {
+            keep = false;
+          }
+        }
+        
+        if (keep) filteredMapping.push(conn);
+      }
+      
+      return filteredMapping;
+    }
+
+    // 获取位号前缀对应的名称
+    function getPrefixName(desig) {
+      if (!desig) return 'Component';
+      var prefix = desig.replace(/\d+$/, '').toUpperCase();
+      var names = {
+        // 连接器
+        J: 'Connector', CN: 'Connector', P: 'Connector', X: 'Connector',
+        USB: 'USB Port', HDR: 'Header', CONN: 'Connector',
+        // 端子排
+        TB: 'Terminal Block', TRM: 'Terminal',
+        // 电池/电源
+        BT: 'Battery', BAT: 'Battery', CELL: 'Cell',
+        // 天线/射频
+        ANT: 'Antenna', RF: 'RF Connector',
+        // 开关/跳线
+        SW: 'Switch', JP: 'Jumper', DIP: 'DIP Switch',
+        // 板卡/模组
+        BRD: 'Board', MOD: 'Module', SUB: 'Sub Board',
+        // IC/芯片
+        U: 'IC', IC: 'IC',
+        // 外部设备
+        FAN: 'Fan', MOT: 'Motor', LCD: 'Display',
+        CAM: 'Camera', SENS: 'Sensor', SPK: 'Speaker', MIC: 'Microphone'
+      };
+      return names[prefix] || 'Component';
+    }
+
+    // 渲染引脚映射 SVG
+    function renderPinMappingSVG(pair, graph) {
+      if (!pair) return '<div style="padding:40px;text-align:center;color:#6b7280;">' + t('noPairSelected') + '</div>';
+
+      var left = pair.left || {};
+      var right = pair.right || {};
+      if (!left.pins || !right.pins) return '<div style="padding:40px;text-align:center;color:#6b7280;">'+t('connectorIncomplete')+'</div>';
+
+      var dark = document.documentElement.dataset.theme === 'dark';
+      var C = dark ? {
+        bg:'#111827', boxFill:'#1f2937', boxStroke:'#6b7280', headerFill:'#374151',
+        textPrimary:'#f9fafb', textSecondary:'#e5e7eb', textMuted:'#9ca3af',
+        pinFill:'#9ca3af', pinStroke:'#111827', lineColor:'#e5e7eb', lineIndirect:'#60a5fa'
+      } : {
+        bg:'#ffffff', boxFill:'#ffffff', boxStroke:'#374151', headerFill:'#f3f4f6',
+        textPrimary:'#1f2937', textSecondary:'#374151', textMuted:'#6b7280',
+        pinFill:'#000000', pinStroke:'#ffffff', lineColor:'#000000', lineIndirect:'#2563eb'
+      };
+      
+      var g = graph || getCachedGraph(netlistData);
+      var mapping = pair.mapping || buildPinMapping(left, right, g);
+      pair.mapping = mapping;
+      
+      // 布局参数
+      var boxW = 200, pinH = 38, padX = 80, padY = 100;
+      var gapX = 380;
+      
+      // 计算左右连接器总高度（header + 引脚区域）
+      function calcBoxH(comp) {
+        var props = comp.props || {};
+        var hasSpec = props.Value || props.Footprint;
+        var headerH = hasSpec ? 48 : 36;
+        var pinCount = Object.keys(comp.pins || {}).length;
+        var pinAreaH = pinCount * pinH + 16;
+        return headerH + pinAreaH;
+      }
+      var leftBoxH = calcBoxH(left);
+      var rightBoxH = calcBoxH(right);
+      var maxBoxH = Math.max(leftBoxH, rightBoxH);
+      var svgH = maxBoxH + padY * 2 + 40;
+      var svgW = padX * 2 + boxW * 2 + gapX;
+      
+      var parts = ['<svg xmlns="http://www.w3.org/2000/svg" width="'+svgW+'" height="'+svgH+'" viewBox="0 0 '+svgW+' '+svgH+'" style="font-family:system-ui,sans-serif;background:'+C.bg+';">'];
+      
+      // 计算各部分高度
+      function calcHeaderH(comp) {
+        var props = comp.props || {};
+        return (props.Value || props.Footprint) ? 48 : 36;
+      }
+      var leftHeaderH = calcHeaderH(left);
+      var rightHeaderH = calcHeaderH(right);
+      
+      var leftX = padX, rightX = padX + boxW + gapX;
+      var topY = padY;
+      
+      // 绘制左侧连接器
+      var leftProps = left.props || {};
+      parts.push('<rect x="'+leftX+'" y="'+topY+'" width="'+boxW+'" height="'+leftBoxH+'" rx="6" fill="'+C.boxFill+'" stroke="'+C.boxStroke+'" stroke-width="2"/>');
+      parts.push('<rect x="'+leftX+'" y="'+topY+'" width="'+boxW+'" height="'+leftHeaderH+'" rx="6" fill="'+C.headerFill+'"/>');
+      parts.push('<rect x="'+leftX+'" y="'+(topY+leftHeaderH/2)+'" width="'+boxW+'" height="'+(leftHeaderH/2)+'" fill="'+C.headerFill+'"/>');
+      parts.push('<text x="'+(leftX+boxW/2)+'" y="'+(topY+16)+'" text-anchor="middle" font-size="14" font-weight="700" fill="'+C.textPrimary+'">'+escapeHtml(left.desig)+'</text>');
+      var leftModuleName = leftProps.Device_name || getPrefixName(left.desig);
+      var leftValue = leftProps.Value || '';
+      var leftDisplayName = leftValue ? leftModuleName + ' ' + leftValue : leftModuleName;
+      parts.push('<text x="'+(leftX+boxW/2)+'" y="'+(topY+28)+'" text-anchor="middle" font-size="10" fill="'+C.textSecondary+'">'+escapeHtml(leftDisplayName)+'</text>');
+      var leftSpec = leftProps['Manufacturer Part'] || '';
+      if (leftSpec) {
+        parts.push('<text x="'+(leftX+boxW/2)+'" y="'+(topY+40)+'" text-anchor="middle" font-size="9" fill="'+C.textMuted+'">'+escapeHtml(leftSpec)+'</text>');
+      }
+
+      // 左侧引脚
+      var leftPins = Object.keys(left.pins).sort(function(a,b){var na=parseInt(a),nb=parseInt(b);if(!isNaN(na)&&!isNaN(nb))return na-nb;return a.localeCompare(b);});
+      var leftPinStartY = topY + leftHeaderH + 13;
+      for (var i = 0; i < leftPins.length; i++) {
+        var pn = leftPins[i];
+        var py = leftPinStartY + i * pinH;
+        var pinData = left.pins[pn] || {};
+        var pinNet = pinData.net || '';
+        var pinLabel = pinData.pinName || pinData.name || inferSignalName(pinNet);
+        parts.push('<circle cx="'+(leftX+boxW)+'" cy="'+py+'" r="5" fill="'+C.pinFill+'" stroke="'+C.pinStroke+'" stroke-width="1.5"/>');
+        parts.push('<text x="'+(leftX+boxW-12)+'" y="'+(py+4)+'" text-anchor="end" font-size="11" font-weight="600" fill="'+C.textSecondary+'">'+escapeHtml(pn)+'</text>');
+        parts.push('<text x="'+(leftX+12)+'" y="'+(py+4)+'" text-anchor="start" font-size="10" fill="'+C.textMuted+'">'+escapeHtml(pinLabel)+'</text>');
+      }
+
+      // 绘制右侧连接器
+      var rightProps = right.props || {};
+      parts.push('<rect x="'+rightX+'" y="'+topY+'" width="'+boxW+'" height="'+rightBoxH+'" rx="6" fill="'+C.boxFill+'" stroke="'+C.boxStroke+'" stroke-width="2"/>');
+      parts.push('<rect x="'+rightX+'" y="'+topY+'" width="'+boxW+'" height="'+rightHeaderH+'" rx="6" fill="'+C.headerFill+'"/>');
+      parts.push('<rect x="'+rightX+'" y="'+(topY+rightHeaderH/2)+'" width="'+boxW+'" height="'+(rightHeaderH/2)+'" fill="'+C.headerFill+'"/>');
+      parts.push('<text x="'+(rightX+boxW/2)+'" y="'+(topY+16)+'" text-anchor="middle" font-size="14" font-weight="700" fill="'+C.textPrimary+'">'+escapeHtml(right.desig)+'</text>');
+      var rightModuleName = rightProps.Device_name || getPrefixName(right.desig);
+      var rightValue = rightProps.Value || '';
+      var rightDisplayName = rightValue ? rightModuleName + ' ' + rightValue : rightModuleName;
+      parts.push('<text x="'+(rightX+boxW/2)+'" y="'+(topY+28)+'" text-anchor="middle" font-size="10" fill="'+C.textSecondary+'">'+escapeHtml(rightDisplayName)+'</text>');
+      var rightSpec = rightProps['Manufacturer Part'] || '';
+      if (rightSpec) {
+        parts.push('<text x="'+(rightX+boxW/2)+'" y="'+(topY+40)+'" text-anchor="middle" font-size="9" fill="'+C.textMuted+'">'+escapeHtml(rightSpec)+'</text>');
+      }
+
+      // 右侧引脚
+      var rightPins = Object.keys(right.pins).sort(function(a,b){var na=parseInt(a),nb=parseInt(b);if(!isNaN(na)&&!isNaN(nb))return na-nb;return a.localeCompare(b);});
+      var rightPinStartY = topY + rightHeaderH + 13;
+      for (var i = 0; i < rightPins.length; i++) {
+        var pn = rightPins[i];
+        var py = rightPinStartY + i * pinH;
+        var pinData = right.pins[pn] || {};
+        var pinNet = pinData.net || '';
+        var pinLabel = pinData.pinName || pinData.name || inferSignalName(pinNet);
+        parts.push('<circle cx="'+rightX+'" cy="'+py+'" r="5" fill="'+C.pinFill+'" stroke="'+C.pinStroke+'" stroke-width="1.5"/>');
+        parts.push('<text x="'+(rightX+12)+'" y="'+(py+4)+'" text-anchor="start" font-size="11" font-weight="600" fill="'+C.textSecondary+'">'+escapeHtml(pn)+'</text>');
+        parts.push('<text x="'+(rightX+boxW-12)+'" y="'+(py+4)+'" text-anchor="end" font-size="10" fill="'+C.textMuted+'">'+escapeHtml(pinLabel)+'</text>');
+      }
+      
+      // 定义颜色
+      var colors = {
+        power: '#dc2626',
+        gnd: '#6b7280',
+        signal: '#16a34a'
+      };
+
+      // 判断是否直接相连（实线渲染）
+      function isDirectConnection(edgeType) {
+        return !edgeType || edgeType === EDGE_TYPES.DIRECT ||
+               edgeType === EDGE_TYPES.THROUGH_L ||
+               edgeType === EDGE_TYPES.THROUGH_FB ||
+               edgeType === EDGE_TYPES.THROUGH_FUSE ||
+               edgeType === EDGE_TYPES.THROUGH_R_LOW;
+      }
+
+      // 获取条件相连的描述
+      function getConditionalLabel(edgeType, value) {
+        if (!edgeType) return '';
+        if (edgeType === EDGE_TYPES.BLOCKED_BY_C) return t('condBlockedByC');
+        if (edgeType === EDGE_TYPES.CONDITIONAL_BY_DIODE) return t('condByDiode');
+        if (edgeType === EDGE_TYPES.CONDITIONAL_BY_DIODE_DIR) return t('condByDiodeDir');
+        if (edgeType === EDGE_TYPES.CONDITIONAL_BY_MOSFET) return t('condByMosfet');
+        if (edgeType === EDGE_TYPES.CONDITIONAL_BY_BJT) return t('condByBjt');
+        if (edgeType === EDGE_TYPES.ISOLATED_BY_TRANSFORMER) return t('condByTransformer');
+        if (edgeType === EDGE_TYPES.ISOLATED_BY_OPTO) return t('condByOpto');
+        if (edgeType === EDGE_TYPES.STOP_AT_IC) return t('condByIc');
+        if (edgeType === EDGE_TYPES.THROUGH_R) return t('condByR') + '(' + (value || '') + ')';
+        if (edgeType === EDGE_TYPES.THROUGH_R_LOW) return t('condByRLow') + '(' + (value || '') + ')';
+        return t('condConnected');
+      }
+
+      // 为每个网络生成唯一颜色
+      var netColorMap = {};
+      var colorPalette = [
+        '#16a34a', '#0891b2', '#7c3aed', '#db2777', '#ea580c',
+        '#8b5cf6', '#06b6d4', '#f59e0b', '#ec4899', '#6366f1',
+        '#14b8a6', '#a855f7', '#f97316', '#0ea5e9', '#84cc16',
+        '#e11d48', '#2563eb', '#9333ea', '#059669', '#d97706'
+      ];
+      var colorIndex = 0;
+      function getNetColor(netName, netType) {
+        if (netType === 'power') return colors.power;
+        if (netType === 'gnd') return colors.gnd;
+        if (!netName) return colors.signal;
+        if (!netColorMap[netName]) {
+          netColorMap[netName] = colorPalette[colorIndex % colorPalette.length];
+          colorIndex++;
+        }
+        return netColorMap[netName];
+      }
+
+      // 分类连接：按网络类型分类（仅显示直接连接）
+      var powerConnections = [];
+      var gndConnections = [];
+      var signalConnections = [];
+
+      for (var mi = 0; mi < mapping.length; mi++) {
+        var conn = mapping[mi];
+        // 过滤：跳过条件相连的连接，只显示直接连接
+        if (!isDirectConnection(conn.edgeType)) {
+          continue;
+        }
+        var netType = conn.netType || 'signal';
+        if (netType === 'gnd') {
+          gndConnections.push(conn);
+        } else if (netType === 'power') {
+          powerConnections.push(conn);
+        } else {
+          signalConnections.push(conn);
+        }
+      }
+
+      // 绘制所有连线（统一函数）
+      function drawConnection(conn, lineColor, netTypeAttr) {
+        var leftIdx = leftPins.indexOf(String(conn.leftPin));
+        var rightIdx = rightPins.indexOf(String(conn.rightPin));
+        if (leftIdx < 0 || rightIdx < 0) return;
+
+        var y1 = leftPinStartY + leftIdx * pinH;
+        var y2 = rightPinStartY + rightIdx * pinH;
+        var x1 = leftX + boxW;
+        var x2 = rightX;
+        var midX = (x1 + x2) / 2;
+        var midY = (y1 + y2) / 2;
+        var nt = ' data-net-type="' + netTypeAttr + '"';
+        var isDirect = isDirectConnection(conn.edgeType);
+        var netLabel = conn.net || conn.leftNet || '';
+        var netName = conn.net || conn.leftNet || '';
+        var netColor = getNetColor(netName, netTypeAttr);
+
+        if (isDirect) {
+          // 实线连接
+          parts.push('<line'+nt+' x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" stroke="'+netColor+'" stroke-width="2" opacity="0.7"/>');
+          parts.push('<text'+nt+' x="'+midX+'" y="'+(midY-12)+'" text-anchor="middle" font-size="9" fill="'+netColor+'">'+escapeHtml(netLabel)+'</text>');
+        } else {
+          // 条件性连接：虚线 + 标注
+          var condLabel = getConditionalLabel(conn.edgeType, conn.value || '');
+          parts.push('<line'+nt+' x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" stroke="'+netColor+'" stroke-width="2" stroke-dasharray="6,4" opacity="0.8"/>');
+          parts.push('<text'+nt+' x="'+midX+'" y="'+(midY-12)+'" text-anchor="middle" font-size="9" fill="'+netColor+'" font-weight="600">'+t('condConnected')+' ('+condLabel+')</text>');
+          parts.push('<text'+nt+' x="'+midX+'" y="'+(midY+14)+'" text-anchor="middle" font-size="8" fill="'+C.textMuted+'">'+escapeHtml(netLabel)+'</text>');
+        }
+      }
+
+      // 绘制 GND 连线
+      for (var gi = 0; gi < gndConnections.length; gi++) {
+        drawConnection(gndConnections[gi], colors.gnd, 'gnd');
+      }
+
+      // 绘制电源连线
+      for (var pi = 0; pi < powerConnections.length; pi++) {
+        drawConnection(powerConnections[pi], colors.power, 'power');
+      }
+
+      // 绘制信号连线
+      for (var si = 0; si < signalConnections.length; si++) {
+        drawConnection(signalConnections[si], colors.signal, 'signal');
+      }
+
+      parts.push('</svg>');
+      return parts.join('');
+    }
+
+    // 引脚映射缩放/平移
+    var pmZoom = 100, pmPanX = 0, pmPanY = 0, pmDragging = false, pmLastX, pmLastY;
+    var pmRafPending = false;
+    var pmNetTypeFilter = { all: false, power: true, gnd: false, signal: true };
+
+    function applyPinMappingFilter() {
+      var canvas = document.getElementById('mapping-canvas');
+      if (!canvas) return;
+      var all = pmNetTypeFilter.all;
+      canvas.querySelectorAll('[data-net-type]').forEach(function(el) {
+        var t = el.getAttribute('data-net-type');
+        var show = all || !!pmNetTypeFilter[t];
+        el.style.visibility = show ? '' : 'hidden';
+      });
+    }
+
+    // 初始化按钮状态
+    document.querySelectorAll('.ntf-btn').forEach(function(b) {
+      b.classList.toggle('active', !!pmNetTypeFilter[b.dataset.type]);
+    });
+
+    document.querySelectorAll('.ntf-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var type = btn.dataset.type;
+        if (type === 'all') {
+          pmNetTypeFilter = { all: true, power: false, gnd: false, signal: false };
+        } else {
+          pmNetTypeFilter.all = false;
+          pmNetTypeFilter[type] = !pmNetTypeFilter[type];
+          if (!pmNetTypeFilter.power && !pmNetTypeFilter.gnd && !pmNetTypeFilter.signal) {
+            pmNetTypeFilter.all = true;
+          }
+        }
+        document.querySelectorAll('.ntf-btn').forEach(function(b) {
+          b.classList.toggle('active', !!pmNetTypeFilter[b.dataset.type]);
+        });
+        applyPinMappingFilter();
+      });
+    });
+
+    function updatePmTransform(smooth) {
+      var canvas = document.getElementById('mapping-canvas');
+      if (canvas) {
+        if (smooth) {
+          canvas.classList.add('smooth-transition');
+        } else {
+          canvas.classList.remove('smooth-transition');
+        }
+        canvas.style.transform = 'translate3d('+pmPanX+'px,'+pmPanY+'px,0) scale('+(pmZoom/100)+')';
+      }
+      var level = document.getElementById('pm-zoom-level');
+      if (level) level.textContent = Math.round(pmZoom) + '%';
+    }
+
+    function schedulePmTransformUpdate() {
+      if (pmRafPending) return;
+      pmRafPending = true;
+      requestAnimationFrame(function() {
+        pmRafPending = false;
+        updatePmTransform(false);
+      });
+    }
+
+    function centerPinMapping() {
+      var viewport = document.getElementById('mapping-viewport');
+      var svg = document.querySelector('#mapping-canvas svg');
+      if (!viewport || !svg) { updatePmTransform(); return; }
+      var vpW = viewport.clientWidth;
+      var vpH = viewport.clientHeight;
+      var svgW = parseFloat(svg.getAttribute('width')) || 0;
+      var svgH = parseFloat(svg.getAttribute('height')) || 0;
+      if (svgW) {
+        pmPanX = (vpW - svgW * pmZoom / 100) / 2;
+        pmPanY = 0;
+      }
+      updatePmTransform(true);
+    }
+
+    function populatePairSelector(pairs, graph) {
+      window._pmPairs = pairs;
+      window._pmGraph = graph;
+      
+      // 收集所有独立器件
+      var devices = {};
+      for (var i = 0; i < pairs.length; i++) {
+        var left = pairs[i].left;
+        var right = pairs[i].right;
+        if (left && left.desig) {
+          if (!devices[left.desig]) {
+            devices[left.desig] = { desig: left.desig, type: left.type, pinCount: Object.keys(left.pins || {}).length };
+          }
+        }
+        if (right && right.desig) {
+          if (!devices[right.desig]) {
+            devices[right.desig] = { desig: right.desig, type: right.type, pinCount: Object.keys(right.pins || {}).length };
+          }
+        }
+      }
+      
+      // 填充器件选择下拉框
+      var deviceSelect = document.getElementById('device-select');
+      var deviceList = Object.keys(devices).sort();
+      deviceSelect.innerHTML = '<option value="">' + t('selectDevice') + '</option>';
+      for (var i = 0; i < deviceList.length; i++) {
+        var d = devices[deviceList[i]];
+        var opt = document.createElement('option');
+        opt.value = d.desig;
+        opt.textContent = d.desig + ' (' + d.pinCount + ' pins)';
+        deviceSelect.appendChild(opt);
+      }
+      
+      // 填充连接器对选择下拉框（默认显示全部）
+      var pairSelect = document.getElementById('connector-pair-select');
+      pairSelect.innerHTML = '<option value="">' + t('selectPair') + '</option>';
+      for (var i = 0; i < pairs.length; i++) {
+        var opt = document.createElement('option');
+        opt.value = i;
+        opt.textContent = pairs[i].displayName + ' (' + pairs[i].sharedCount + ')';
+        pairSelect.appendChild(opt);
+      }
+      pairSelect.disabled = false;
+      
+      // 器件选择变化时更新连接器对
+      deviceSelect.addEventListener('change', function() {
+        var selectedDevice = this.value;
+        pairSelect.innerHTML = '<option value="">' + t('selectPair') + '</option>';
+        
+        if (!selectedDevice) {
+          // 显示全部
+          for (var i = 0; i < pairs.length; i++) {
+            var opt = document.createElement('option');
+            opt.value = i;
+            opt.textContent = pairs[i].displayName + ' (' + pairs[i].sharedCount + ')';
+            pairSelect.appendChild(opt);
+          }
+        } else {
+          // 只显示与选中器件相关的配对
+          for (var i = 0; i < pairs.length; i++) {
+            var left = pairs[i].left;
+            var right = pairs[i].right;
+            if ((left && left.desig === selectedDevice) || (right && right.desig === selectedDevice)) {
+              var opt = document.createElement('option');
+              opt.value = i;
+              opt.textContent = pairs[i].displayName + ' (' + pairs[i].sharedCount + ')';
+              pairSelect.appendChild(opt);
+            }
+          }
+        }
+});
+       
+      // 防抖渲染变量
+      var renderTimeout = null;
+      var lastRenderIdx = null;
+      
+      // 连接器对选择变化时渲染（防抖+分块渲染优化）
+      pairSelect.addEventListener('change', function() {
+        var idx = parseInt(this.value);
+        
+        // 清除之前的渲染任务（防抖）
+        if (renderTimeout) {
+          clearTimeout(renderTimeout);
+        }
+        
+        // 如果点击同一个，不渲染
+        if (isNaN(idx) || !pairs[idx] || idx === lastRenderIdx) {
+          return;
+        }
+        
+        var canvas = document.getElementById('mapping-canvas');
+        canvas.innerHTML = '<div style="padding:20px;text-align:center;color:#6b7280;">'+t('rendering')+'</div>';
+        
+        // 防抖延迟100ms后渲染
+        renderTimeout = setTimeout(function() {
+          try {
+            lastRenderIdx = idx;
+            var svg = renderPinMappingSVG(pairs[idx], graph);
+            canvas.innerHTML = svg;
+            
+            // 延迟应用筛选
+            setTimeout(function() {
+              applyPinMappingFilter();
+              pmZoom = 100;
+              centerPinMapping();
+            }, 50);
+          } catch(e) {
+            console.error('Render error on select:', e);
+            canvas.innerHTML = '<div style="padding:40px;text-align:center;color:#dc2626;">'+t('renderFailed')+' ' + escapeHtml(e.message) + '</div>';
+          }
+        }, 100);
+      });
+    }
+
+    // Pin mapping viewport events
+    var pmViewport = document.getElementById('mapping-viewport');
+    var pmCanvas = document.getElementById('mapping-canvas');
+    if (pmCanvas) {
+      pmCanvas.addEventListener('transitionend', function() {
+        pmCanvas.classList.remove('smooth-transition');
+      });
+    }
+    if (pmViewport) {
+      pmViewport.addEventListener('wheel', function(e) {
+        e.preventDefault();
+
+        var rect = pmViewport.getBoundingClientRect();
+        var mouseX = e.clientX - rect.left;
+        var mouseY = e.clientY - rect.top;
+
+        var oldScale = pmZoom / 100;
+        var delta = e.deltaY > 0 ? -0.05 : 0.05;
+        var newScale = Math.max(0.25, Math.min(2, oldScale + delta));
+
+        pmPanX = mouseX - (mouseX - pmPanX) * (newScale / oldScale);
+        pmPanY = mouseY - (mouseY - pmPanY) * (newScale / oldScale);
+
+        pmZoom = newScale * 100;
+        schedulePmTransformUpdate();
+      }, { passive: false });
+      pmViewport.addEventListener('mousedown', function(e) {
+        if (e.target.tagName === 'BUTTON' || e.target.tagName === 'SELECT') return;
+        pmDragging = true;
+        pmLastX = e.clientX;
+        pmLastY = e.clientY;
+        pmViewport.classList.add('dragging');
+      });
+    }
+    document.addEventListener('mousemove', function(e) {
+      if (!pmDragging) return;
+      pmPanX += e.clientX - pmLastX;
+      pmPanY += e.clientY - pmLastY;
+      pmLastX = e.clientX;
+      pmLastY = e.clientY;
+      schedulePmTransformUpdate();
+    });
+    document.addEventListener('mouseup', function() {
+      pmDragging = false;
+      var vp = document.getElementById('mapping-viewport');
+      if (vp) vp.classList.remove('dragging');
+    });
+
+    var pmZoomIn = document.getElementById('pm-zoom-in');
+    var pmZoomOut = document.getElementById('pm-zoom-out');
+    var pmZoomReset = document.getElementById('pm-zoom-reset');
+    if (pmZoomIn) pmZoomIn.addEventListener('click', function() {
+      var vp = document.getElementById('mapping-viewport');
+      if (!vp) { pmZoom = Math.min(200, pmZoom + 25); updatePmTransform(false); return; }
+      var rect = vp.getBoundingClientRect();
+      var centerX = rect.width / 2;
+      var centerY = rect.height / 2;
+      var oldScale = pmZoom / 100;
+      var newScale = Math.min(2, oldScale + 0.25);
+      pmPanX = centerX - (centerX - pmPanX) * (newScale / oldScale);
+      pmPanY = centerY - (centerY - pmPanY) * (newScale / oldScale);
+      pmZoom = newScale * 100;
+      updatePmTransform(false);
+    });
+    if (pmZoomOut) pmZoomOut.addEventListener('click', function() {
+      var vp = document.getElementById('mapping-viewport');
+      if (!vp) { pmZoom = Math.max(25, pmZoom - 25); updatePmTransform(false); return; }
+      var rect = vp.getBoundingClientRect();
+      var centerX = rect.width / 2;
+      var centerY = rect.height / 2;
+      var oldScale = pmZoom / 100;
+      var newScale = Math.max(0.25, oldScale - 0.25);
+      pmPanX = centerX - (centerX - pmPanX) * (newScale / oldScale);
+      pmPanY = centerY - (centerY - pmPanY) * (newScale / oldScale);
+      pmZoom = newScale * 100;
+      updatePmTransform(false);
+    });
+    if (pmZoomReset) pmZoomReset.addEventListener('click', function() { pmZoom = 100; centerPinMapping(); });
+
+    // ===== 主渲染函数 =====
+    function renderNetlist(netlist) {
+      try {
+        // 重置星图状态（切换/刷新网表后避免残留旧器件）
+        starInited = false;
+        starMainDesig = '';
+        starSelectedNet = null;
+        starHiddenSet = {};
+        starModelCache.key = null;
+        starModelCache.data = null;
+        var components = netlist.components || netlist;
+        var compIds = Object.keys(components);
+        var totalPins = 0;
+        var netSet = {};
+        for (var cid in components) {
+          var pim = components[cid].pinInfoMap || {};
+          for (var pn in pim) { totalPins++; netSet[pim[pn].net || '(悬空)'] = true; }
+        }
+        document.getElementById('stat-components').textContent = compIds.length;
+        document.getElementById('stat-nets').textContent = Object.keys(netSet).length;
+        document.getElementById('stat-pins').textContent = totalPins;
+
+        // 统计：未命名网络、电源网络
+        var unnamedNets = {};
+        var powerNets = {};
+        for (var cid2 in components) {
+          var pim2 = components[cid2].pinInfoMap || {};
+          for (var pn2 in pim2) {
+            var pinData = pim2[pn2];
+            var net2 = pinData.net || '';
+            if (!net2 || net2 === '(悬空)') { 
+              continue;
+            }
+            if (/^\$1N\d+$/.test(net2) || /^\$\d+/.test(net2)) { unnamedNets[net2] = true; continue; }
+            if (isPowerNet(net2)) { powerNets[net2] = true; }
+          }
+        }
+        var unnamedCount = Object.keys(unnamedNets).length;
+        var unnamedEl = document.getElementById('stat-unnamed');
+        unnamedEl.textContent = unnamedCount;
+        unnamedEl.className = 'stat-value' + (unnamedCount > 0 ? ' warn' : '');
+        renderFullTable(components);
+        renderConnectionTable(components);
+        populateFilters(components);
+
+        // Generate pin mapping pairs（使用缓存优化）
+        try {
+          console.log('[网表] 开始生成连接器对...');
+          var startTime = Date.now();
+          
+          // 使用缓存的graph
+          var pmGraph = getCachedGraph(netlist);
+          console.log('[网表] 网络图计算完成，耗时:', Date.now() - startTime, 'ms');
+          
+          // 渐进式生成pairs（添加进度提示）
+          var pairsLoader = function() {
+            var t0 = Date.now();
+            var pairs = extractConnectorPairs(netlist);
+            console.log('[网表] 连接器对生成完成，耗时:', Date.now() - t0, 'ms，pairs数:', pairs.length);
+            
+            populatePairSelector(pairs, pmGraph);
+            if (pairs.length > 0) {
+              // 第一个连接器对延迟渲染
+              setTimeout(function() {
+                var svg = renderPinMappingSVG(pairs[0], pmGraph);
+                document.getElementById('mapping-canvas').innerHTML = svg;
+                applyPinMappingFilter();
+                document.getElementById('connector-pair-select').value = '0';
+              }, 50);
+            } else {
+              document.getElementById('mapping-canvas').innerHTML = '<div style="padding:40px;text-align:center;color:#6b7280;">' + t('noPairs') + '</div>';
+            }
+          };
+          
+          // 延迟执行避免阻塞UI
+          setTimeout(pairsLoader, 50);
+        } catch(e) {
+          console.error('Pin mapping error:', e);
+          document.getElementById('mapping-canvas').innerHTML = '<div style="padding:40px;text-align:center;color:#dc2626;">'+t('pmGenFailed')+' ' + escapeHtml(e.message) + '</div>';
+        }
+
+        // 延迟渲染JSON，避免切换卡顿
+        setTimeout(function() {
+          document.getElementById('json-view').textContent = JSON.stringify(netlist, null, 2);
+        }, 50);
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('main-content').style.display = 'flex';
+        document.getElementById('stats-bar').style.display = 'flex';
+        document.getElementById('btn-bom').style.display = 'inline-flex';
+        document.getElementById('export-dropdown').style.display = 'inline-block';
+      } catch (e) {
+        document.getElementById('loading').innerHTML = '<div style="color:red;padding:20px;">'+t('renderFailed')+' ' + escapeHtml(e.message) + '</div>';
+      }
+    }
+
+    // ============================================================
+    // ===== 器件拓扑图（主从星型布局）模块 =====
+    // ============================================================
+    // 器件分类 css -> 颜色（与全量网表分类标签视觉一致）
+    var STAR_CAT_COLORS = {
+      ic:'#E74C3C',           // IC - 红色
+      resistor:'#3498DB',     // 电阻 - 蓝色
+      capacitor:'#27AE60',    // 电容 - 绿色
+      inductor:'#F39C12',     // 电感 - 橙色
+      diode:'#8E44AD',        // 二极管 - 紫色
+      crystal:'#16A085',      // 晶振 - 青绿色
+      connector:'#E67E22',    // 连接器 - 深橙色
+      fuse:'#C0392B',         // 保险丝 - 深红色
+      led:'#F1C40F',          // LED - 黄色
+      transistor:'#9B59B6',   // 三极管 - 深紫色
+      switch:'#1ABC9C',       // 开关 - 青色
+      relay:'#D35400',        // 继电器 - 赭色
+      transformer:'#C0392B',  // 变压器 - 深红色
+      optocoupler:'#7F8C8D',  // 光耦 - 青灰色
+      battery:'#2ECC71',      // 电池 - 鲜绿色
+      antenna:'#E74C3C',      // 天线 - 红色
+      speaker:'#34495E',      // 扬声器 - 深蓝灰色
+      motor:'#9B59B6',        // 电机 - 深紫色
+      display:'#16A085',      // 显示屏 - 青绿色
+      sensor:'#F39C12',       // 传感器 - 橙色
+      filter:'#8E44AD',       // 滤波器 - 紫色
+      protector:'#C0392B',    // 保护器件 - 深红色
+      oscillator:'#16A085',   // 振荡器 - 青绿色
+      regulator:'#3498DB',    // 稳压器 - 蓝色
+      converter:'#E67E22',    // 转换器 - 深橙色
+      driver:'#9B59B6',       // 驱动器 - 深紫色
+      controller:'#27AE60',  // 控制器 - 绿色
+      mcu:'#E74C3C',         // MCU - 红色
+      memory:'#3498DB',      // 存储器 - 蓝色
+      interface:'#F39C12',   // 接口芯片 - 橙色
+      power:'#C0392B',       // 电源芯片 - 深红色
+      amplifier:'#8E44AD',   // 放大器 - 紫色
+      comparator:'#16A085',  // 比较器 - 青绿色
+      timer:'#E67E22',       // 定时器 - 深橙色
+      logic:'#27AE60',       // 逻辑芯片 - 绿色
+      other:'#95A5A6'        // 其他 - 蓝灰色（温和的灰色）
+    };
+    // 网络配色调色板（哈希取色，区分不同网络）
+    var STAR_NET_PALETTE = ['#409EFF','#67C23A','#E6A23C','#F56C6C','#7C4DFF','#00C1DE','#FF7D00','#13C2C2','#EB2F96','#52C41A'];
+
+    function starNetColor(netName) {
+      // 根据网络类型返回特定颜色
+      if (isPwrNet(netName)) return '#dc2626';  // 电源用红色
+      if (isGndNet(netName)) return '#6b7280';  // 地用灰色
+      // 信号线用哈希取色
+      var hash = 0;
+      for (var i = 0; i < netName.length; i++) hash = netName.charCodeAt(i) + ((hash << 5) - hash);
+      return STAR_NET_PALETTE[Math.abs(hash) % STAR_NET_PALETTE.length];
+    }
+    // 网络归类：power / gnd / signal（用于类型过滤，复用现有判断函数）
+    function starNetType(net) {
+      if (isGndNet(net)) return 'gnd';
+      if (isPwrNet(net)) return 'power';
+      return 'signal';
+    }
+
+    // ---- 数据适配层：把 components 对象 + pinInfoMap 转成星型模型 ----
+    var starModelCache = { key: null, data: null };
+    function buildStarModel(netlist) {
+      var components = netlist.components || netlist;
+      var key = (graphCache.netlistStr) || JSON.stringify(components).slice(0, 120);
+      if (starModelCache.key === key && starModelCache.data) return starModelCache.data;
+
+      var comps = [];
+      var byDesig = {};
+      var netMap = {}; // netName -> [ "U1-3", ... ]
+      for (var cid in components) {
+        var comp = components[cid];
+        var props = comp.props || {};
+        var pim = comp.pinInfoMap || {};
+        var desig = props.Designator || cid;
+        var cat = classify(desig);
+        var pinNames = [];
+        // 引脚号按数字优先排序
+        var pns = Object.keys(pim).sort(function(a, b) {
+          var na = parseInt(a, 10), nb = parseInt(b, 10);
+          if (!isNaN(na) && !isNaN(nb)) return na - nb;
+          return String(a).localeCompare(String(b));
+        });
+        for (var i = 0; i < pns.length; i++) {
+          var pn = pns[i];
+          var full = desig + '-' + pn;
+          pinNames.push(full);
+          var rawNet = pim[pn].net;
+          var net = (rawNet && rawNet !== '(悬空)') ? rawNet : '';
+          if (!net) continue;
+          if (/^\$1N\d+$/.test(net) || /^\$\d+/.test(net)) continue; // 跳过未命名网络
+          if (!netMap[net]) netMap[net] = [];
+          netMap[net].push(full);
+        }
+        var c = {
+          designator: desig,
+          footprint: props.Footprint || '',
+          value: props.Value || '',
+          desc: desc(comp),
+          catCss: cat.css,
+          catName: cat.name,
+          pins: pinNames,
+          deviceName: props.Device_name || '',
+          manufacturerPart: props['Manufacturer Part'] || ''
+        };
+        comps.push(c);
+        byDesig[desig] = c;
+      }
+      var networks = [];
+      for (var nm in netMap) {
+        if (netMap[nm].length < 2) continue; // 单点网络无连接意义
+        networks.push({ name: nm, pins: netMap[nm], type: starNetType(nm) });
+      }
+      var model = { components: comps, networks: networks, byDesig: byDesig };
+      starModelCache.key = key;
+      starModelCache.data = model;
+      return model;
+    }
+
+    // ---- 布局：计算单个器件的引脚坐标 ----
+    function initStarPinLayout(comp, isMain) {
+      var pinCount = comp.pins.length || 1;
+      // 卡片布局参数（扩大1.25倍）
+      var pinH = 30;    // 引脚行高 (24 * 1.25 = 30)
+      comp.boxW = 156;  // 固定宽度 (125 * 1.25 = 156)
+
+      // 标题栏高度根据是否有制造商料号决定（与连接图一致）
+      var hasSpec = comp.value || comp.footprint;
+      var hasMfgPart = comp.manufacturerPart;
+      var headerH = 45; // 基础高度 (36 * 1.25 = 45)
+      if (hasSpec && hasMfgPart) headerH = 60; // 有料号时增加高度 (48 * 1.25 = 60)
+      else if (hasSpec) headerH = 52; // 只有值/封装时 (40 * 1.25 ≈ 50, 调整为52)
+
+      comp.boxH = headerH + pinCount * pinH + 12;
+      comp.headerH = headerH;
+      var halfH = comp.boxH / 2;
+
+      // 标题栏显示内容（与连接图一致）
+      var deviceName = comp.deviceName || getPrefixName(comp.designator);
+      var valueDisplay = comp.value ? (deviceName + ' ' + comp.value) : deviceName;
+      comp.headerDisplay = {
+        line1: comp.designator,        // 位号
+        line2: valueDisplay,             // 器件名 + 值
+        line3: comp.manufacturerPart    // 制造商料号（如果有）
+      };
+
+      comp.pinLayout = comp.pins.map(function(name, i) {
+        var num = name.split('-').pop();
+        // py 相对于卡片中心：从标题栏下方开始，增加间距，减去半高
+        var py = headerH + 12 + i * pinH - halfH;
+        return isMain
+          ? { name: name, num: num, px: comp.boxW / 2, py: py, txtX: comp.boxW / 2 - 10, txtY: py + 5 }
+          : { name: name, num: num, px: -comp.boxW / 2, py: py, txtX: -comp.boxW / 2 + 10, txtY: py + 5 };
+      });
+    }
+
+    // ---- 找出与主器件有网络连接的器件 ----
+    function getStarShowComponents(model, mainDesig, hiddenSet) {
+      if (!mainDesig) return [];
+      var related = {};
+      related[mainDesig] = true;
+      model.networks.forEach(function(net) {
+        if (hiddenSet[net.name.toUpperCase()]) return;
+        var touchesMain = net.pins.some(function(p) { return p.split('-')[0] === mainDesig; });
+        if (touchesMain) net.pins.forEach(function(p) { related[p.split('-')[0]] = true; });
+      });
+      return model.components.filter(function(c) { return related[c.designator]; });
+    }
+
+    // ---- 布局所有显示器件（主器件居中，从器件右侧堆叠）----
+    function layoutStarComponents(model, mainDesig, hiddenSet) {
+      var shown = getStarShowComponents(model, mainDesig, hiddenSet);
+      var mainComp = model.byDesig[mainDesig];
+      if (!mainComp) return { shown: [], main: null };
+      var slaves = shown.filter(function(c) { return c.designator !== mainDesig; });
+
+      slaves.forEach(function(c) { initStarPinLayout(c, false); });
+      initStarPinLayout(mainComp, true);
+
+      mainComp.x = 400;
+
+      // 按主器件引脚连接顺序排列从器件
+      var netToSlaves = {};
+      model.networks.forEach(function(net) {
+        if (hiddenSet[net.name.toUpperCase()]) return;
+        netToSlaves[net.name] = net.pins
+          .filter(function(p) { return p.split('-')[0] !== mainDesig; })
+          .map(function(p) { return p.split('-')[0]; });
+      });
+      var arranged = [];
+      var arrangedSet = {};
+      mainComp.pinLayout.forEach(function(mp) {
+        model.networks.forEach(function(net) {
+          if (hiddenSet[net.name.toUpperCase()]) return;
+          if (net.pins.indexOf(mp.name) >= 0) {
+            (netToSlaves[net.name] || []).forEach(function(sn) {
+              if (!arrangedSet[sn]) {
+                var s = slaves.find(function(c) { return c.designator === sn; });
+                if (s) { arranged.push(s); arrangedSet[sn] = true; }
+              }
+            });
+          }
+        });
+      });
+      if (arranged.length === 0) arranged = slaves.slice();
+
+      var slaveGap = 40;
+      var totalH = 0;
+      arranged.forEach(function(c) { totalH += c.boxH; });
+      totalH += (arranged.length - 1) * slaveGap;
+
+      mainComp.y = totalH / 2;
+      var currentY = 0;
+      arranged.forEach(function(c) {
+        c.x = mainComp.x + 1080; // 1200 * 0.9 = 1080，缩短左右卡片间距
+        c.y = currentY + c.boxH / 2;
+        currentY += c.boxH + slaveGap;
+      });
+      return { shown: [mainComp].concat(arranged), main: mainComp };
+    }
+
+    // ---- 渲染星图 SVG 字符串 ----
+    function renderStarSVG(model, mainDesig, selectedNet, hiddenSet) {
+      var layout = layoutStarComponents(model, mainDesig, hiddenSet);
+      var main = layout.main;
+      if (!main) return '<div style="padding:40px;text-align:center;color:#6b7280;">' + t('selectMainDeviceHint') + '</div>';
+      var shown = layout.shown;
+
+      var dark = document.documentElement.dataset.theme === 'dark';
+      var C = dark ? {
+        bg:'#111827', boxStroke:'#1f2937', textPin:'#e5e7eb', pinFill:'#1f2937', pinStroke:'#9ca3af',
+        cardBg:'#1f2937', headerFill:'#374151', textPrimary:'#f9fafb', textSecondary:'#e5e7eb', textMuted:'#9ca3af',
+        pinText:'#e5e7eb'
+      } : {
+        bg:'#ffffff', boxStroke:'#ffffff', textPin:'#333333', pinFill:'#ffffff', pinStroke:'#666666',
+        cardBg:'#ffffff', headerFill:'#f3f4f6', textPrimary:'#1f2937', textSecondary:'#374151', textMuted:'#6b7280',
+        pinText:'#374151'
+      };
+
+      // 计算包围盒
+      var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      shown.forEach(function(c) {
+        minX = Math.min(minX, c.x - c.boxW / 2);
+        maxX = Math.max(maxX, c.x + c.boxW / 2);
+        minY = Math.min(minY, c.y - c.boxH / 2);
+        maxY = Math.max(maxY, c.y + c.boxH / 2);
+      });
+      var pad = 120;
+      var vbX = minX - pad, vbY = minY - pad;
+      var svgW = (maxX - minX) + pad * 2;
+      var svgH = (maxY - minY) + pad * 2;
+
+      var parts = ['<svg xmlns="http://www.w3.org/2000/svg" width="' + Math.round(svgW) + '" height="' + Math.round(svgH) + '" viewBox="' + Math.round(vbX) + ' ' + Math.round(vbY) + ' ' + Math.round(svgW) + ' ' + Math.round(svgH) + '" style="font-family:system-ui,sans-serif;background:' + C.bg + ';">'];
+
+      var selUp = selectedNet ? selectedNet.toUpperCase() : null;
+
+      // ---- 连线层：主器件内部同网络多引脚 + 主->从 ----
+      model.networks.forEach(function(net) {
+        if (hiddenSet[net.name.toUpperCase()]) return;
+        // 检查网络类型过滤
+        if (!starNetTypeFilter.all && !starNetTypeFilter[net.type]) return;
+        var color = starNetColor(net.name);
+        var isSel = selUp && net.name.toUpperCase() === selUp;
+        var dim = selUp && !isSel;
+        var nt = net.type;
+
+        // 主器件内部连线（>=2 个主引脚在同网络）
+        var mainPins = net.pins.filter(function(p) { return p.split('-')[0] === main.designator; });
+        if (mainPins.length >= 2) {
+          var pts = mainPins.map(function(pn) {
+            var p = main.pinLayout.find(function(x) { return x.name === pn; });
+            return p ? { x: main.x - main.boxW / 2 - 10, y: main.y + p.py } : null;
+          }).filter(Boolean);
+          pts.sort(function(a, b) { return a.y - b.y; });
+          var ext = 20, sw = isSel ? 4 : 2, op = dim ? 0.15 : 0.6;
+          for (var i = 1; i < pts.length; i++) {
+            var pr = pts[i - 1], cu = pts[i];
+            parts.push('<path data-net-type="' + nt + '" d="M ' + pr.x + ' ' + pr.y + ' L ' + (pr.x - ext) + ' ' + pr.y + ' L ' + (cu.x - ext) + ' ' + cu.y + ' L ' + cu.x + ' ' + cu.y + '" stroke="' + color + '" stroke-width="' + sw + '" fill="none" opacity="' + op + '"/>');
+          }
+        }
+
+        // 主器件 -> 从器件
+        var mainPin = net.pins.find(function(p) { return p.split('-')[0] === main.designator; });
+        if (!mainPin) return;
+        var mp = main.pinLayout.find(function(x) { return x.name === mainPin; });
+        if (!mp) return;
+        var mx = main.x + mp.px, my = main.y + mp.py;
+        var ext2 = isSel ? 50 : 0;
+
+        net.pins.forEach(function(pinStr) {
+          var cn = pinStr.split('-')[0];
+          if (cn === main.designator) return;
+          var slave = model.byDesig[cn];
+          if (!slave || !slave.pinLayout) return;
+          var sp = slave.pinLayout.find(function(x) { return x.name === pinStr; });
+          if (!sp) return;
+          var sx = slave.x + sp.px, sy = slave.y + sp.py;
+
+          // 使用简单直线，减少计算
+          var lx = (mx + sx) / 2, ly = (my + sy) / 2 - 6;
+          var sw = isSel ? 4 : 2;
+          var opacity = dim ? 0.15 : 0.8;
+
+          // 单次 push，减少字符串拼接
+          parts.push('<g data-net-type="' + nt + '"><path d="M ' + mx + ' ' + my + ' L ' + sx + ' ' + sy + '" stroke="' + color + '" stroke-width="' + sw + '" fill="none" opacity="' + opacity + '"/>');
+
+          // 只在选中或距离较远时显示标签
+          if (!selUp || isSel) {
+            var dx = sx - mx, dy = sy - my;
+            if ((dx * dx + dy * dy > 10000) || isSel) {
+              parts.push('<text data-net="' + escapeHtml(net.name) + '" x="' + lx + '" y="' + ly + '" fill="' + color + '" font-size="11" text-anchor="middle" style="pointer-events:none;">' + escapeHtml(net.name) + '</text>');
+            }
+          }
+          parts.push('</g>');
+        });
+      });
+
+      // ---- 器件层 ----
+      shown.forEach(function(comp) {
+        var isMainC = comp.designator === main.designator;
+        var catColor = STAR_CAT_COLORS[comp.catCss] || STAR_CAT_COLORS.other;
+        var headerH = comp.headerH || 45;
+        var halfW = comp.boxW / 2;
+        var halfH = comp.boxH / 2;
+        var topY = -halfH;
+        var headerDisplay = comp.headerDisplay || { line1: comp.designator, line2: '', line3: '' };
+        parts.push('<g class="star-comp-node" data-des="' + escapeHtml(comp.designator) + '" transform="translate(' + comp.x + ',' + comp.y + ')">');
+        // 卡片主体
+        parts.push('<rect x="' + (-halfW) + '" y="' + topY + '" width="' + comp.boxW + '" height="' + comp.boxH + '" rx="5" fill="' + C.cardBg + '" stroke="' + catColor + '" stroke-width="2"/>');
+        // 标题栏（使用分类色填充）
+        parts.push('<rect x="' + (-halfW) + '" y="' + topY + '" width="' + comp.boxW + '" height="' + headerH + '" rx="5" fill="' + catColor + '"/>');
+        parts.push('<rect x="' + (-halfW) + '" y="' + (topY + headerH / 2) + '" width="' + comp.boxW + '" height="' + (headerH / 2) + '" fill="' + catColor + '"/>');
+        // 第一行：位号（白色文字，加粗）
+        parts.push('<text x="0" y="' + (topY + 20) + '" text-anchor="middle" font-size="16" font-weight="700" fill="#ffffff">' + escapeHtml(headerDisplay.line1) + '</text>');
+        // 第二行：器件名 + 值（白色半透明）
+        if (headerDisplay.line2) {
+          parts.push('<text x="0" y="' + (topY + 35) + '" text-anchor="middle" font-size="12" fill="rgba(255,255,255,0.9)">' + escapeHtml(headerDisplay.line2) + '</text>');
+        }
+        // 第三行：制造商料号（如果有，更小更淡）
+        if (headerDisplay.line3) {
+          parts.push('<text x="0" y="' + (topY + 48) + '" text-anchor="middle" font-size="10" fill="rgba(255,255,255,0.7)">' + escapeHtml(headerDisplay.line3) + '</text>');
+        }
+        // 引脚列表
+        comp.pinLayout.forEach(function(pin) {
+          // pin.py 已经是相对于卡片中心的坐标
+          // 引脚圆点
+          parts.push('<circle class="star-pin" data-pin="' + escapeHtml(pin.name) + '" cx="' + pin.px + '" cy="' + pin.py + '" r="5" fill="' + C.pinFill + '" stroke="' + catColor + '" stroke-width="1.5"/>');
+          // 引脚号
+          if (isMainC) {
+            // 主器件：右侧引脚，引脚号在圆点右侧
+            parts.push('<text x="' + (pin.px - 10) + '" y="' + (pin.py + 5) + '" text-anchor="end" font-size="12" font-weight="600" fill="' + C.pinText + '">' + escapeHtml(pin.num) + '</text>');
+          } else {
+            // 从器件：左侧引脚，引脚号在圆点左侧
+            parts.push('<text x="' + (pin.px + 10) + '" y="' + (pin.py + 5) + '" text-anchor="start" font-size="12" font-weight="600" fill="' + C.pinText + '">' + escapeHtml(pin.num) + '</text>');
+          }
+        });
+        // 主器件：左侧镜像引脚
+        if (isMainC) {
+          comp.pinLayout.forEach(function(pin) {
+            parts.push('<circle class="star-pin" data-pin="' + escapeHtml(pin.name) + '" cx="' + (-pin.px) + '" cy="' + pin.py + '" r="5" fill="' + C.pinFill + '" stroke="' + catColor + '" stroke-width="1.5"/>');
+            parts.push('<text x="' + (-pin.px + 10) + '" y="' + (pin.py + 5) + '" text-anchor="start" font-size="12" font-weight="600" fill="' + C.pinText + '">' + escapeHtml(pin.num) + '</text>');
+          });
+        }
+        parts.push('</g>');
+      });
+
+      parts.push('</svg>');
+      return parts.join('');
+    }
+
+    // ---- 星图交互状态 ----
+    var szZoom = 40, szPanX = 0, szPanY = 0, szDragging = false, szLastX, szLastY, szRafPending = false;
+    var starMainDesig = '';
+    var starMainY = 0; // 主器件的 y 坐标，用于聚焦对齐
+    var starSelectedNet = null;
+    var starHiddenSet = {}; // 大写网络名 -> true
+    var starNetTypeFilter = { all: true, power: false, gnd: false, signal: false };
+    var starInited = false;
+
+    function updateSzTransform(smooth) {
+      var canvas = document.getElementById('star-canvas');
+      if (canvas) {
+        canvas.classList.toggle('smooth-transition', !!smooth);
+        canvas.style.transform = 'translate3d(' + szPanX + 'px,' + szPanY + 'px,0) scale(' + (szZoom / 100) + ')';
+      }
+      var level = document.getElementById('sz-zoom-level');
+      if (level) level.textContent = Math.round(szZoom * 2.5) + '%';
+    }
+    function scheduleSzTransformUpdate() {
+      if (szRafPending) return;
+      szRafPending = true;
+      requestAnimationFrame(function() { szRafPending = false; updateSzTransform(false); });
+    }
+    function centerStarGraph() {
+      var vp = document.getElementById('star-viewport');
+      var svg = document.querySelector('#star-canvas svg');
+      if (!vp || !svg) { updateSzTransform(); return; }
+      var vpW = vp.clientWidth, vpH = vp.clientHeight;
+      var svgW = parseFloat(svg.getAttribute('width')) || 0;
+      var svgH = parseFloat(svg.getAttribute('height')) || 0;
+      if (svgW) {
+        szPanX = (vpW - svgW * szZoom / 100) / 2;
+        // y 轴对齐到主器件位置，确保主器件在视口中垂直居中
+        var svgTop = parseFloat(svg.getAttribute('viewBox').split(' ')[1]) || 0;
+        szPanY = vpH / 2 - (starMainY + svgTop) * szZoom / 100;
+      }
+      updateSzTransform(true);
+    }
+
+    function applyStarNetTypeFilter() {
+      var canvas = document.getElementById('star-canvas');
+      if (!canvas) return;
+      var all = starNetTypeFilter.all;
+      canvas.querySelectorAll('[data-net-type]').forEach(function(el) {
+        var ty = el.getAttribute('data-net-type');
+        var shouldShow = all || !!starNetTypeFilter[ty];
+        el.style.display = shouldShow ? '' : 'none';
+      });
+    }
+
+    function renderStarFilterTags() {
+      var box = document.getElementById('star-filter-tags');
+      if (!box) return;
+      var nets = Object.keys(starHiddenSet);
+      if (nets.length === 0) { box.style.display = 'none'; box.innerHTML = ''; return; }
+      box.style.display = 'block';
+      var html = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;font-size:11px;font-weight:600;color:var(--text-muted);">';
+      html += '<span data-i18n="filteredNetworks">已过滤的网络</span>';
+      html += '<span style="flex:1;height:1px;background:var(--border);"></span>';
+      html += '</div>';
+      html += '<div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;">';
+      nets.forEach(function(n) {
+        html += '<span class="star-filter-tag" data-net="' + escapeHtml(n) + '" title="' + t('clickToShow') + '" style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;background:#faecd8;color:#e6a23c;font-size:11px;cursor:pointer;">' + escapeHtml(n) + ' <b>×</b></span>';
+      });
+      html += '</div>';
+      box.innerHTML = html;
+      box.querySelectorAll('.star-filter-tag').forEach(function(tag) {
+        tag.addEventListener('click', function() {
+          var netName = tag.dataset.net;
+          delete starHiddenSet[netName];
+          // 检查是否需要更新网络类型过滤状态
+          var model = buildStarModel(netlistData);
+          var net = model.networks.find(function(n) { return n.name.toUpperCase() === netName; });
+          if (net && net.type === 'gnd' && !starNetTypeFilter.all && !starNetTypeFilter.gnd) {
+            // 如果取消的是GND网络过滤，且当前地类型被隐藏，则显示地类型
+            starNetTypeFilter.gnd = true;
+            // 更新按钮状态
+            document.querySelectorAll('.star-ntf-btn').forEach(function(b) {
+              if (b.dataset.type === 'gnd') b.classList.add('active');
+            });
+          }
+          drawStarGraph(false);
+          renderStarFilterTags(); // 更新过滤标签
+          renderStarNetworkList();
+        });
+      });
+    }
+
+    // ---- 网络列表面板相关 ----
+    var starNetworkSearchFilter = '';
+
+    function renderStarNetworkList() {
+      if (!netlistData || !starMainDesig) return;
+      var model = buildStarModel(netlistData);
+      var mainComp = model.byDesig[starMainDesig];
+      if (!mainComp) return;
+
+      // 找出与主器件相关的所有网络
+      var relatedNets = [];
+      model.networks.forEach(function(net) {
+        var touchesMain = net.pins.some(function(p) { return p.split('-')[0] === starMainDesig; });
+        if (touchesMain) {
+          relatedNets.push(net);
+        }
+      });
+
+      // 应用搜索过滤
+      var searchFilter = starNetworkSearchFilter.toUpperCase();
+      if (searchFilter) {
+        relatedNets = relatedNets.filter(function(net) {
+          return net.name.toUpperCase().indexOf(searchFilter) >= 0;
+        });
+      }
+
+      // 按网络名称排序
+      relatedNets.sort(function(a, b) { return a.name.localeCompare(b.name); });
+
+      // 更新统计
+      var totalNets = relatedNets.length;
+      var filteredCount = Object.keys(starHiddenSet).filter(function(n) {
+        return relatedNets.some(function(net) { return net.name.toUpperCase() === n; });
+      }).length;
+
+      document.getElementById('star-total-nets').textContent = filteredCount;
+      document.getElementById('star-filtered-nets').textContent = totalNets;
+
+      // 渲染列表
+      var listEl = document.getElementById('star-network-list');
+      var html = '';
+      relatedNets.forEach(function(net) {
+        var netUp = net.name.toUpperCase();
+        var isHidden = !!starHiddenSet[netUp];
+        var pinCount = net.pins.length;
+        var netType = net.type;
+        var typeColor = '';
+        if (netType === 'power') typeColor = '#dc2626';
+        else if (netType === 'gnd') typeColor = '#6b7280';
+        else if (netType === 'signal') typeColor = '#16a34a';
+
+        html += '<div class="star-network-item' + (isHidden ? ' filtered' : '') + '" data-net="' + escapeHtml(net.name) + '">';
+        html += '<span class="net-name" style="color:' + typeColor + ';">' + escapeHtml(net.name) + '</span>';
+        html += '<span class="net-info">' + pinCount + 'P</span>';
+        html += '<span class="filter-icon' + (isHidden ? ' active' : '') + '">' + (isHidden ? '✓' : '×') + '</span>';
+        html += '</div>';
+      });
+      listEl.innerHTML = html;
+
+      // 绑定点击事件
+      listEl.querySelectorAll('.star-network-item').forEach(function(item) {
+        item.addEventListener('click', function() {
+          var netName = item.dataset.net;
+          var netUp = netName.toUpperCase();
+          if (starHiddenSet[netUp]) {
+            delete starHiddenSet[netUp];
+          } else {
+            starHiddenSet[netUp] = true;
+          }
+          drawStarGraph(false);
+          renderStarNetworkList();
+        });
+      });
+    }
+
+    // 切换网络列表面板显示
+    function toggleStarNetworkSidebar() {
+      var sidebar = document.getElementById('star-network-sidebar');
+      var toggleBtn = document.getElementById('star-toggle-sidebar');
+      if (sidebar.style.display === 'none') {
+        sidebar.style.display = 'flex';
+        toggleBtn.style.display = 'none';
+        renderStarNetworkList();
+      } else {
+        sidebar.style.display = 'none';
+        toggleBtn.style.display = 'block';
+      }
+    }
+
+    // 重绘星图（keepView=true 时保持当前缩放/平移）
+    function drawStarGraph(recenter) {
+      if (!netlistData || !starMainDesig) return;
+      var model = buildStarModel(netlistData);
+      var canvas = document.getElementById('star-canvas');
+      try {
+        canvas.innerHTML = renderStarSVG(model, starMainDesig, starSelectedNet, starHiddenSet);
+        // 存储主器件的 y 坐标，用于聚焦对齐
+        var mainComp = model.byDesig[starMainDesig];
+        if (mainComp) {
+          starMainY = mainComp.y;
+        }
+      } catch (e) {
+        canvas.innerHTML = '<div style="padding:40px;text-align:center;color:#dc2626;">' + escapeHtml(e.message) + '</div>';
+        return;
+      }
+      bindStarSvgEvents();
+      applyStarNetTypeFilter();
+      renderStarFilterTags();
+      // 如果侧边栏是显示的，更新网络列表
+      var sidebar = document.getElementById('star-network-sidebar');
+      if (sidebar && sidebar.style.display !== 'none') {
+        renderStarNetworkList();
+      }
+      // 更新侧边栏切换按钮显示状态
+      var toggleBtn = document.getElementById('star-toggle-sidebar');
+      if (toggleBtn && starMainDesig) {
+        toggleBtn.style.display = sidebar.style.display === 'none' ? 'block' : 'none';
+      }
+      if (recenter) { szZoom = 40; centerStarGraph(); }
+      else updateSzTransform(false);
+    }
+
+    function bindStarSvgEvents() {
+      var canvas = document.getElementById('star-canvas');
+      if (!canvas) return;
+      // 点击器件 -> 设为主器件
+      canvas.querySelectorAll('.star-comp-node').forEach(function(g) {
+        g.addEventListener('click', function(e) {
+          if (e.target.classList.contains('star-pin')) return; // 引脚单独处理
+          var des = g.dataset.des;
+          if (des && des !== starMainDesig) {
+            starMainDesig = des;
+            starSelectedNet = null;
+            var sel = document.getElementById('star-device-select');
+            if (sel) sel.value = des;
+            // 重置网络类型过滤状态（确保所有类型可见）
+            starNetTypeFilter = { all: true, power: false, gnd: false, signal: false };
+            // 更新按钮状态
+            document.querySelectorAll('.star-ntf-btn').forEach(function(b) {
+              if (b.dataset.type === 'all') b.classList.add('active');
+              else b.classList.remove('active');
+            });
+            // 自动过滤与主器件相关的GND网络
+            var model = buildStarModel(netlistData);
+            autoFilterGndNetworks(model, starMainDesig);
+            drawStarGraph(true);
+          }
+        });
+      });
+      // 点击引脚 -> 高亮所在网络
+      canvas.querySelectorAll('.star-pin').forEach(function(c) {
+        c.addEventListener('click', function(e) {
+          e.stopPropagation();
+          var pin = c.dataset.pin;
+          var model = buildStarModel(netlistData);
+          var net = model.networks.find(function(n) { return n.pins.indexOf(pin) >= 0; });
+          if (!net) return;
+          starSelectedNet = (starSelectedNet === net.name) ? null : net.name;
+          drawStarGraph(false);
+        });
+      });
+      // 点击网络标签 -> 隐藏该网络
+      canvas.querySelectorAll('.star-net-label').forEach(function(txt) {
+        txt.addEventListener('click', function(e) {
+          e.stopPropagation();
+          var n = (txt.dataset.net || '').toUpperCase();
+          if (n) { starHiddenSet[n] = true; starSelectedNet = null; drawStarGraph(false); }
+        });
+      });
+    }
+
+    function populateStarDeviceSelect(model) {
+      var sel = document.getElementById('star-device-select');
+      if (!sel) return;
+      // 按引脚数降序（主控/IC 在前）
+      var sorted = model.components.slice().sort(function(a, b) { return b.pins.length - a.pins.length; });
+      var html = '<option value="">' + t('selectMainDevice') + '</option>';
+      sorted.forEach(function(c) {
+        html += '<option value="' + escapeHtml(c.designator) + '">' + escapeHtml(c.designator) + ' (' + c.pins.length + 'P)</option>';
+      });
+      sel.innerHTML = html;
+      // 默认选引脚最多的器件
+      if (!starMainDesig && sorted.length > 0) starMainDesig = sorted[0].designator;
+      if (starMainDesig) sel.value = starMainDesig;
+    }
+
+    // 首次进入星图面板时初始化
+    function initStarGraphPanel() {
+      if (!netlistData) return;
+      var model = buildStarModel(netlistData);
+      populateStarDeviceSelect(model);
+      // 重置网络类型过滤状态（确保所有类型可见）
+      starNetTypeFilter = { all: true, power: false, gnd: false, signal: false };
+      // 更新按钮状态
+      document.querySelectorAll('.star-ntf-btn').forEach(function(b) {
+        if (b.dataset.type === 'all') b.classList.add('active');
+        else b.classList.remove('active');
+      });
+      // 默认过滤与主器件相关的GND网络
+      if (starMainDesig) {
+        autoFilterGndNetworks(model, starMainDesig);
+      }
+      drawStarGraph(true);
+      // 显示侧边栏切换按钮
+      var toggleBtn = document.getElementById('star-toggle-sidebar');
+      if (toggleBtn && starMainDesig) {
+        toggleBtn.style.display = 'block';
+      }
+    }
+
+    // 自动过滤 GND 网络到 starHiddenSet（只过滤与主器件相关的GND网络）
+    function autoFilterGndNetworks(model, mainDesig) {
+      if (!mainDesig) return;
+      // 处理与主器件相关的GND网络
+      model.networks.forEach(function(net) {
+        if (net.type === 'gnd') {
+          var touchesMain = net.pins.some(function(p) { return p.split('-')[0] === mainDesig; });
+          var netNameUpper = net.name.toUpperCase();
+          if (touchesMain) {
+            // 与主器件相关，添加到过滤列表
+            starHiddenSet[netNameUpper] = true;
+          } else {
+            // 与主器件无关，从过滤列表中移除（如果是GND网络）
+            if (starHiddenSet[netNameUpper]) {
+              delete starHiddenSet[netNameUpper];
+            }
+          }
+        }
+      });
+    }
+
+    // 主器件下拉
+    (function() {
+      var sel = document.getElementById('star-device-select');
+      if (sel) sel.addEventListener('change', function() {
+        starMainDesig = sel.value;
+        starSelectedNet = null;
+        // 重置网络类型过滤状态（确保所有类型可见）
+        starNetTypeFilter = { all: true, power: false, gnd: false, signal: false };
+        // 更新按钮状态
+        document.querySelectorAll('.star-ntf-btn').forEach(function(b) {
+          if (b.dataset.type === 'all') b.classList.add('active');
+          else b.classList.remove('active');
+        });
+        // 切换主器件时自动过滤与主器件相关的GND网络
+        if (starMainDesig) {
+          var model = buildStarModel(netlistData);
+          autoFilterGndNetworks(model, starMainDesig);
+          drawStarGraph(true);
+        }
+      });
+    })();
+
+    // 网络类型过滤按钮
+    document.querySelectorAll('.star-ntf-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var type = btn.dataset.type;
+        if (type === 'all') {
+          starNetTypeFilter = { all: true, power: false, gnd: false, signal: false };
+        } else {
+          starNetTypeFilter.all = false;
+          starNetTypeFilter[type] = !starNetTypeFilter[type];
+          if (!starNetTypeFilter.power && !starNetTypeFilter.gnd && !starNetTypeFilter.signal) starNetTypeFilter.all = true;
+        }
+        document.querySelectorAll('.star-ntf-btn').forEach(function(b) {
+          b.classList.toggle('active', !!starNetTypeFilter[b.dataset.type]);
+        });
+        applyStarNetTypeFilter();
+      });
+    });
+
+    // 网络搜索框输入事件
+    var starSearchInput = document.getElementById('star-network-search-input');
+    if (starSearchInput) {
+      starSearchInput.addEventListener('input', function() {
+        starNetworkSearchFilter = this.value;
+        renderStarNetworkList();
+      });
+    }
+
+    // 侧边栏切换按钮
+    var starToggleBtn = document.getElementById('star-toggle-sidebar');
+    if (starToggleBtn) {
+      starToggleBtn.addEventListener('click', toggleStarNetworkSidebar);
+    }
+
+    // 侧边栏关闭按钮
+    var starCloseBtn = document.getElementById('star-close-sidebar');
+    if (starCloseBtn) {
+      starCloseBtn.addEventListener('click', toggleStarNetworkSidebar);
+    }
+
+    // 缩放/平移（复用 pm 同款 CSS transform 方案，独立状态）
+    (function() {
+      var vp = document.getElementById('star-viewport');
+      var canvas = document.getElementById('star-canvas');
+      if (canvas) canvas.addEventListener('transitionend', function() { canvas.classList.remove('smooth-transition'); });
+      if (vp) {
+        vp.addEventListener('wheel', function(e) {
+          e.preventDefault();
+          var rect = vp.getBoundingClientRect();
+          var mx = e.clientX - rect.left, my = e.clientY - rect.top;
+          var oldScale = szZoom / 100;
+          var newScale = Math.max(0.25, Math.min(2, oldScale + (e.deltaY > 0 ? -0.05 : 0.05)));
+          szPanX = mx - (mx - szPanX) * (newScale / oldScale);
+          szPanY = my - (my - szPanY) * (newScale / oldScale);
+          szZoom = newScale * 100;
+          scheduleSzTransformUpdate();
+        }, { passive: false });
+        vp.addEventListener('mousedown', function(e) {
+          if (e.target.tagName === 'BUTTON' || e.target.tagName === 'SELECT') return;
+          if (e.target.classList && (e.target.classList.contains('star-pin') || e.target.classList.contains('star-net-label'))) return;
+          szDragging = true; szLastX = e.clientX; szLastY = e.clientY; vp.classList.add('dragging');
+        });
+      }
+      document.addEventListener('mousemove', function(e) {
+        if (!szDragging) return;
+        szPanX += e.clientX - szLastX; szPanY += e.clientY - szLastY;
+        szLastX = e.clientX; szLastY = e.clientY;
+        scheduleSzTransformUpdate();
+      });
+      document.addEventListener('mouseup', function() {
+        szDragging = false;
+        var v = document.getElementById('star-viewport');
+        if (v) v.classList.remove('dragging');
+      });
+      var zi = document.getElementById('sz-zoom-in'), zo = document.getElementById('sz-zoom-out'), zr = document.getElementById('sz-zoom-reset');
+      function zoomAt(dir) {
+        var v = document.getElementById('star-viewport');
+        if (!v) { szZoom = Math.max(10, Math.min(80, szZoom + dir * 10)); updateSzTransform(true); return; }
+        var rect = v.getBoundingClientRect();
+        var cx = rect.width / 2, cy = rect.height / 2;
+        var oldScale = szZoom / 100;
+        var newScale = Math.max(0.10, Math.min(0.80, oldScale + dir * 0.10));
+        szPanX = cx - (cx - szPanX) * (newScale / oldScale);
+        szPanY = cy - (cy - szPanY) * (newScale / oldScale);
+        szZoom = newScale * 100;
+        updateSzTransform(true);
+      }
+      if (zi) zi.addEventListener('click', function() { zoomAt(1); });
+      if (zo) zo.addEventListener('click', function() { zoomAt(-1); });
+      if (zr) zr.addEventListener('click', function() { szZoom = 40; centerStarGraph(); });
+    })();
+
+    // 侧边栏切换（防抖优化）
+    var sidebarRenderTimeout = null;
+    document.querySelectorAll('.sidebar-item').forEach(function(item) {
+      item.addEventListener('click', function() {
+        // 清除之前的渲染任务（防抖）
+        if (sidebarRenderTimeout) {
+          clearTimeout(sidebarRenderTimeout);
+        }
+        // 延迟处理避免卡顿
+        sidebarRenderTimeout = setTimeout(function() {
+          document.querySelectorAll('.sidebar-item').forEach(function(i) { i.classList.remove('active'); });
+          document.querySelectorAll('.content-panel').forEach(function(p) { p.classList.remove('active'); });
+          item.classList.add('active');
+          document.getElementById('panel-' + item.dataset.panel).classList.add('active');
+          if (item.dataset.panel === 'pin-mapping') {
+            setTimeout(function() { pmZoom = 100; centerPinMapping(); }, 0);
+          } else if (item.dataset.panel === 'star-graph') {
+            setTimeout(function() {
+              if (!starInited) { starInited = true; initStarGraphPanel(); }
+              else { szZoom = 40; centerStarGraph(); }
+            }, 0);
+          }
+        }, 50);
+      });
+    });
+
+    // 导出下拉菜单
+    var exportDropdown = document.getElementById('export-dropdown');
+    var exportMenu = document.getElementById('export-menu');
+    var exportBtn = document.getElementById('btn-export');
+
+    exportBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      exportMenu.classList.toggle('show');
+    });
+
+    document.addEventListener('click', function() {
+      exportMenu.classList.remove('show');
+    });
+
+    // 导出菜单项点击事件
+    document.querySelectorAll('.export-menu-item').forEach(function(item) {
+      item.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        var action = this.dataset.action;
+        console.log('Export action:', action, 'netlistData:', !!netlistData);
+        exportMenu.classList.remove('show');
+
+        if (action === 'export-full-csv') {
+          if (!netlistData) { console.error('No netlist data'); return; }
+          var comps = netlistData.components || netlistData;
+          var lines = ['Designator,Pin,PinName,Net,Category,Description'];
+          for (var cid in comps) {
+            var c = comps[cid], p = c.props || {};
+            var pim = c.pinInfoMap || {};
+            var d = p.Designator || cid;
+            var cat = classify(d).name;
+            var descStr = desc(c);
+            for (var pn in pim) lines.push(d+','+pn+','+(pim[pn].pinName||'')+','+(pim[pn].net||'')+','+cat+','+descStr);
+          }
+          var blob = new Blob(['\uFEFF'+lines.join('\n')],{type:'text/csv;charset=utf-8'});
+          console.log('Trying to save full netlist CSV...');
+          eda.sys_FileSystem.saveFile(blob, 'full_netlist.csv');
+          eda.sys_Message.showToastMessage(t('toastFullCsv'));
+        } else if (action === 'export-conn-csv') {
+          if (!netlistData) return;
+          var comps = netlistData.components || netlistData;
+          var lines = ['Group,SourceDevice,SourcePin,SourcePort,Net,TargetDevice,TargetPin,TargetPort,Note'];
+          var netToPins = {};
+          for (var cid in comps) {
+            var c = comps[cid], p = c.props || {};
+            var pim = c.pinInfoMap || {};
+            var desig = p.Designator || cid;
+            for (var pn in pim) {
+              var net = pim[pn].net || '(悬空)';
+              if (net === '(悬空)') continue;
+              if (!netToPins[net]) netToPins[net] = [];
+              netToPins[net].push({desig:desig, pn:pn, pinName:pim[pn].pinName||''});
+            }
+          }
+          for (var net in netToPins) {
+            var pins = netToPins[net];
+            if (pins.length === 2) lines.push(getGroup(net)[0]+','+pins[0].desig+','+pins[0].pn+','+pins[0].pinName+','+net+','+pins[1].desig+','+pins[1].pn+','+pins[1].pinName+',');
+            else lines.push(getGroup(net)[0]+','+pins.map(function(p){return p.desig+':'+p.pn;}).join(';')+','+net+',,'+pins.length+' pins');
+          }
+          var blob = new Blob(['\uFEFF'+lines.join('\n')],{type:'text/csv;charset=utf-8'});
+          eda.sys_FileSystem.saveFile(blob, 'connection_netlist.csv');
+          eda.sys_Message.showToastMessage(t('toastConnCsv'));
+        } else if (action === 'export-json') {
+          if (!netlistStr2) return;
+          var blob = new Blob([netlistStr2],{type:'application/json;charset=utf-8'});
+          eda.sys_FileSystem.saveFile(blob, 'netlist.json');
+          eda.sys_Message.showToastMessage(t('toastJson'));
+        }
+      });
+    });
+
+    // BOM
+    document.getElementById('btn-bom').addEventListener('click', function() {
+      if (!netlistData) return;
+      var comps = netlistData.components || netlistData;
+      var bomMap = {};
+      for (var cid in comps) {
+        var c = comps[cid], p = c.props || {};
+        var key = (p.Device_name||'') + '|' + (p.Value||'') + '|' + (p['Manufacturer Part']||'');
+        if (!bomMap[key]) bomMap[key] = {name:p.Device_name||'', value:p.Value||'', fp:p.Footprint||'', mfr:p.Manufacturer||'', mpn:p['Manufacturer Part']||'', spn:p['Supplier Part']||'', desigs:[], count:0};
+        bomMap[key].desigs.push(p.Designator || cid);
+        bomMap[key].count++;
+      }
+      var html = '';
+      for (var k in bomMap) {
+        var b = bomMap[k];
+        html += '<tr><td>' + escapeHtml(b.desigs.join(', ')) + '</td><td>' + escapeHtml(b.name) + '</td><td>' + escapeHtml(b.value) + '</td><td>' + escapeHtml(b.fp) + '</td><td>' + escapeHtml(b.mfr) + '</td><td>' + escapeHtml(b.mpn) + '</td><td>' + escapeHtml(b.spn) + '</td><td>' + b.count + '</td></tr>';
+      }
+      document.getElementById('bom-tbody').innerHTML = html;
+      document.getElementById('bom-modal').classList.add('visible');
+    });
+    document.getElementById('bom-close').addEventListener('click', function() { document.getElementById('bom-modal').classList.remove('visible'); });
+    document.getElementById('bom-export-csv').addEventListener('click', function() {
+      if (!netlistData) return;
+      var comps = netlistData.components || netlistData;
+      var bomMap = {};
+      for (var cid in comps) {
+        var c = comps[cid], p = c.props || {};
+        var key = (p.Device_name||'') + '|' + (p.Value||'') + '|' + (p['Manufacturer Part']||'');
+        if (!bomMap[key]) bomMap[key] = {name:p.Device_name||'', value:p.Value||'', fp:p.Footprint||'', mfr:p.Manufacturer||'', mpn:p['Manufacturer Part']||'', spn:p['Supplier Part']||'', desigs:[], count:0};
+        bomMap[key].desigs.push(p.Designator || cid);
+        bomMap[key].count++;
+      }
+      var lines = ['Designators,Name,Value,Footprint,Manufacturer,MPN,SPN,Quantity'];
+      for (var k in bomMap) {
+        var b = bomMap[k];
+        lines.push('"'+b.desigs.join('; ')+'","'+b.name+'","'+b.value+'","'+b.fp+'","'+b.mfr+'","'+b.mpn+'","'+b.spn+'",'+b.count);
+      }
+      var blob = new Blob(['\uFEFF'+lines.join('\n')],{type:'text/csv;charset=utf-8'});
+      eda.sys_FileSystem.saveFile(blob, 'BOM_'+new Date().toISOString().slice(0,10)+'.csv');
+      eda.sys_Message.showToastMessage(t('toastBomCsv'));
+    });
+
+    // 面板专属导出按钮
+    document.querySelectorAll('.panel-export-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var action = this.dataset.action;
+        if (action === 'export-full-csv') {
+          if (!netlistData) return;
+          var comps = netlistData.components || netlistData;
+          var lines = ['Designator,Pin,PinName,Net,Category,Description'];
+          for (var cid in comps) {
+            var c = comps[cid], p = c.props || {};
+            var pim = c.pinInfoMap || {};
+            var d = p.Designator || cid;
+            var cat = classify(d).name;
+            var dsc = desc(c);
+            for (var pn in pim) lines.push(d+','+pn+','+(pim[pn].pinName||'')+','+(pim[pn].net||'')+','+cat+','+dsc);
+          }
+          var blob = new Blob(['\uFEFF'+lines.join('\n')],{type:'text/csv;charset=utf-8'});
+          eda.sys_FileSystem.saveFile(blob, 'full_netlist.csv');
+          eda.sys_Message.showToastMessage(t('toastFullCsv'));
+        } else if (action === 'export-conn-csv') {
+          if (!netlistData) return;
+          var comps = netlistData.components || netlistData;
+          var lines = ['Group,SourceDevice,SourcePin,SourcePort,Net,TargetDevice,TargetPin,TargetPort,Note'];
+          var netToPins = {};
+          for (var cid in comps) {
+            var c = comps[cid], p = c.props || {};
+            var pim = c.pinInfoMap || {};
+            var desig = p.Designator || cid;
+            for (var pn in pim) {
+              var net = pim[pn].net || '(悬空)';
+              if (net === '(悬空)') continue;
+              if (!netToPins[net]) netToPins[net] = [];
+              netToPins[net].push({desig:desig, pn:pn, pinName:pim[pn].pinName||''});
+            }
+          }
+          for (var net in netToPins) {
+            var pins = netToPins[net];
+            if (pins.length === 2) lines.push(getGroup(net)[0]+','+pins[0].desig+','+pins[0].pn+','+pins[0].pinName+','+net+','+pins[1].desig+','+pins[1].pn+','+pins[1].pinName+',');
+            else lines.push(getGroup(net)[0]+','+pins.map(function(p){return p.desig+':'+p.pn;}).join(';')+','+net+',,'+pins.length+' pins');
+          }
+          var blob = new Blob(['\uFEFF'+lines.join('\n')],{type:'text/csv;charset=utf-8'});
+          eda.sys_FileSystem.saveFile(blob, 'connection_netlist.csv');
+          eda.sys_Message.showToastMessage(t('toastConnCsv'));
+        } else if (action === 'export-svg') {
+          var svgEl = document.querySelector('#mapping-canvas svg');
+          if (!svgEl) { eda.sys_Message.showToastMessage(t('toastNoSvg')); return; }
+          var svgStr = new XMLSerializer().serializeToString(svgEl);
+          var blob = new Blob([svgStr], {type:'image/svg+xml;charset=utf-8'});
+          eda.sys_FileSystem.saveFile(blob, 'pin_mapping.svg');
+          eda.sys_Message.showToastMessage(t('toastSvg'));
+        } else if (action === 'export-star-svg') {
+          var starSvgEl = document.querySelector('#star-canvas svg');
+          if (!starSvgEl) { eda.sys_Message.showToastMessage(t('toastNoStarSvg')); return; }
+          var starSvgStr = new XMLSerializer().serializeToString(starSvgEl);
+          var starBlob = new Blob([starSvgStr], {type:'image/svg+xml;charset=utf-8'});
+          eda.sys_FileSystem.saveFile(starBlob, 'star_graph_' + (starMainDesig || 'netlist') + '.svg');
+          eda.sys_Message.showToastMessage(t('toastStarSvg'));
+        } else if (action === 'export-json') {
+          if (!netlistStr2) return;
+          var blob = new Blob([netlistStr2],{type:'application/json;charset=utf-8'});
+          eda.sys_FileSystem.saveFile(blob, 'netlist.json');
+          eda.sys_Message.showToastMessage(t('toastJson'));
+        }
+      });
+    });
+
+    // ===== 直接调用 API 获取网表数据 =====
+    async function fetchNetlist() {
+      try {
+        var netlistFile = await eda.sch_ManufactureData.getNetlistFile();
+        if (!netlistFile) {
+          document.getElementById('loading').innerHTML = '<div style="color:#dc2626;padding:20px;">无法获取网表，请确保已打开原理图</div>';
+          return;
+        }
+        var netlistStr = await netlistFile.text();
+        var netlist = JSON.parse(netlistStr);
+        
+        // 保存到全局变量，供导出功能使用
+        netlistData = netlist;
+        netlistStr2 = netlistStr;
+        
+        // 渲染
+        renderNetlist(netlist);
+      } catch(e) {
+        document.getElementById('loading').innerHTML = '<div style="color:#dc2626;padding:20px;">获取网表失败: ' + (e.message || e) + '</div>';
+      }
+    }
+    
+    // 全局变量用于导出
+    var netlistData = null;
+    var netlistStr2 = '';
+
+    // 页面加载时直接获取网表（内部会请求 noConnected 数据）
+    fetchNetlist();
+    
+    // 初始化 i18n
+    applyI18n();
+
+    // 刷新按钮 - 重新获取网表
+    document.getElementById('btn-refresh').addEventListener('click', function() {
+      document.getElementById('loading').style.display = '';
+      document.getElementById('main-content').style.display = 'none';
+      fetchNetlist().then(function() {
+        // 延迟让 EDA UI 恢复状态
+        setTimeout(function() {
+          window.dispatchEvent(new Event('resize'));
+        }, 500);
+      });
+    });
+  </script>
+</body>
+</html>
